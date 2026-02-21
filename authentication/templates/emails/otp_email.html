@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verify Your GradLink Account</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;800&display=swap');
+
+        body {
+            font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #0f172a;
+            color: #f1f5f9;
+        }
+
+        .wrapper {
+            width: 100%;
+            table-layout: fixed;
+            background-color: #0f172a;
+            padding-bottom: 40px;
+        }
+
+        .container {
+            max-width: 500px;
+            margin: 40px auto;
+            background: #1e293b;
+            border-radius: 24px;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+
+        .gradient-top {
+            height: 6px;
+            background: linear-gradient(90deg, #6366f1 0%, #a855f7 50%, #ec4899 100%);
+        }
+
+        .header {
+            padding: 40px 20px 20px;
+            text-align: center;
+        }
+
+        .logo {
+            font-size: 32px;
+            font-weight: 800;
+            background: linear-gradient(90deg, #818cf8, #c084fc);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -1px;
+        }
+
+        .content {
+            padding: 0 40px 40px;
+            text-align: center;
+        }
+
+        .welcome-badge {
+            display: inline-block;
+            padding: 6px 16px;
+            background: rgba(99, 102, 241, 0.1);
+            color: #818cf8;
+            border-radius: 100px;
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 24px;
+        }
+
+        h2 {
+            font-size: 26px;
+            font-weight: 800;
+            color: #ffffff;
+            margin: 0 0 16px;
+            letter-spacing: -0.5px;
+        }
+
+        p {
+            font-size: 15px;
+            line-height: 1.6;
+            color: #94a3b8;
+            margin-bottom: 32px;
+        }
+
+        .otp-container {
+            position: relative;
+            background: rgba(15, 23, 42, 0.5);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 20px;
+            padding: 32px;
+            margin-bottom: 32px;
+        }
+
+        .otp-label {
+            display: block;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: #64748b;
+            margin-bottom: 16px;
+            font-weight: 700;
+        }
+
+        .otp-code {
+            font-size: 48px;
+            font-weight: 800;
+            letter-spacing: 8px;
+            color: #ffffff;
+            margin: 0;
+            font-family: 'Monaco', 'Consolas', monospace;
+        }
+
+        .timer {
+            margin-top: 16px;
+            font-size: 13px;
+            color: #f43f5e;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .footer {
+            padding: 32px;
+            text-align: center;
+            background: rgba(15, 23, 42, 0.3);
+        }
+
+        .footer p {
+            font-size: 12px;
+            margin: 0;
+            color: #64748b;
+        }
+
+        .divider {
+            height: 1px;
+            background: rgba(255, 255, 255, 0.05);
+            margin: 24px 0;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="wrapper">
+        <div class="container">
+            <div class="gradient-top"></div>
+            <div class="header">
+                <div class="logo">GradLink</div>
+            </div>
+            <div class="content">
+                <div class="welcome-badge">Verification Required</div>
+                <h2>Verify your identity</h2>
+                <p>To securely complete your registration, please enter the following 6-digit code on the verification
+                    screen.</p>
+
+                <div class="otp-container">
+                    <span class="otp-label">Direct Access Code</span>
+                    <div class="otp-code">{{ otp_code }}</div>
+                    <div class="timer">
+                        <span>&bull; Expires in {{ expiry_minutes }} minutes</span>
+                    </div>
+                </div>
+
+                <p style="margin-bottom: 0; font-size: 13px;">If you didn't request this, please disregard this email or
+                    contact support if you have concerns.</p>
+            </div>
+            <div class="footer">
+                <p>&copy; 2026 GradLink Inc.</p>
+                <p style="margin-top: 8px;">The premier platform for career growth.</p>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>
