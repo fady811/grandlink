@@ -1,0 +1,160 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+:root {
+    --primary-color: #2563eb;
+    /* Blue 600 */
+    --primary-hover: #1d4ed8;
+    --sidebar-bg: #0f172a;
+    /* Slate 900 */
+    --navbar-bg: #ffffff;
+    --bg-main: #f1f5f9;
+    --text-main: #0f172a;
+    --text-muted: #64748b;
+    --border-color: #e2e8f0;
+    --border-radius-sm: 6px;
+    --border-radius-md: 8px;
+    --card-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+}
+
+body {
+    font-family: 'Inter', sans-serif !important;
+    background-color: var(--bg-main) !important;
+    color: var(--text-main) !important;
+    font-size: 0.875rem !important;
+    /* Smaller base font size (14px) */
+    line-height: 1.5 !important;
+}
+
+/* --- Sidebar Optimization --- */
+.main-sidebar {
+    background-color: var(--sidebar-bg) !important;
+    width: 260px !important;
+}
+
+/* Fix Email/Username in Sidebar */
+.user-panel {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+    padding: 15px 10px !important;
+    display: flex !important;
+    align-items: center !important;
+}
+
+.user-panel .info {
+    padding-left: 10px !important;
+    overflow: hidden !important;
+    width: 100% !important;
+}
+
+.user-panel .info a {
+    display: block !important;
+    white-space: normal !important;
+    /* Allow email to wrap if very long */
+    word-break: break-all !important;
+    font-size: 0.8rem !important;
+    line-height: 1.2 !important;
+    color: #cbd5e1 !important;
+}
+
+.brand-link {
+    padding: 0.8rem 1rem !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
+}
+
+.brand-text {
+    font-size: 1.1rem !important;
+    font-weight: 700 !important;
+    color: #fff !important;
+    letter-spacing: 0.5px;
+}
+
+.nav-sidebar .nav-item .nav-link {
+    font-size: 0.85rem !important;
+    padding: 8px 12px !important;
+    margin: 2px 10px !important;
+    border-radius: var(--border-radius-sm) !important;
+    color: #94a3b8 !important;
+}
+
+.nav-sidebar .nav-link.active {
+    background-color: var(--primary-color) !important;
+    color: #ffffff !important;
+    box-shadow: none !important;
+}
+
+/* --- Layout --- */
+.content-wrapper {
+    background-color: var(--bg-main) !important;
+    padding: 1.5rem !important;
+}
+
+.content-header h1 {
+    font-size: 1.5rem !important;
+    font-weight: 600 !important;
+    color: #0f172a !important;
+}
+
+/* --- Cards & Tables --- */
+.card {
+    border-radius: var(--border-radius-md) !important;
+    box-shadow: var(--card-shadow) !important;
+    border: 1px solid var(--border-color) !important;
+}
+
+.card-header {
+    background-color: #ffffff !important;
+    padding: 0.75rem 1.25rem !important;
+}
+
+.card-title {
+    font-size: 0.9rem !important;
+    font-weight: 600 !important;
+}
+
+.table thead th {
+    font-size: 0.75rem !important;
+    padding: 10px 15px !important;
+    background-color: #f8fafc !important;
+    color: var(--text-muted) !important;
+}
+
+.table tbody td {
+    font-size: 0.85rem !important;
+    padding: 10px 15px !important;
+}
+
+/* --- Buttons --- */
+.btn {
+    font-size: 0.8rem !important;
+    padding: 6px 14px !important;
+    border-radius: var(--border-radius-sm) !important;
+}
+
+.submit-row {
+    padding: 12px 20px !important;
+    border-top: 1px solid var(--border-color) !important;
+}
+
+/* --- Inputs --- */
+.form-control,
+.select2-container--default .select2-selection--single {
+    font-size: 0.85rem !important;
+    padding: 0.4rem 0.75rem !important;
+    border-radius: var(--border-radius-sm) !important;
+}
+
+/* --- Breadcrumbs --- */
+.breadcrumb {
+    font-size: 0.75rem !important;
+    background-color: transparent !important;
+}
+
+/* Custom Scrollbar for better consistency */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 10px;
+}

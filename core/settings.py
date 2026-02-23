@@ -38,6 +38,7 @@ ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['localhost', '127.0.0.1'])
 
 # Application definition
 INSTALLED_APPS = [
+    'jazzmin',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -57,6 +58,10 @@ INSTALLED_APPS = [
     'ats_engine',
 ]
 
+STATICFILES_DIRS = [
+    BASE_DIR / "static",
+]
+
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'corsheaders.middleware.CorsMiddleware',
@@ -73,7 +78,7 @@ ROOT_URLCONF = 'core.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [BASE_DIR / 'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -85,6 +90,68 @@ TEMPLATES = [
         },
     },
 ]
+
+JAZZMIN_SETTINGS = {
+    "site_title": "GradLink Admin",
+    "site_header": "GradLink",
+    "site_brand": "GradLink",
+    "site_logo_icons": "fas fa-shield-alt",
+    "welcome_sign": "GradLink Management System",
+    "copyright": "GradLink Ltd",
+    "search_model": ["authentication.User"],
+    "user_avatar": None,
+    # Top Menu
+    "topmenu_links": [
+        {"name": "Home", "url": "admin:index", "permissions": ["auth.view_user"]},
+        {"model": "authentication.User"},
+    ],
+    # Side Menu
+    "show_sidebar": True,
+    "navigation_expanded": True,
+    "hide_apps": [],
+    "hide_models": [],
+    "order_with_respect_to": ["authentication", "profiles", "jobs", "ats_engine"],
+    "icons": {
+        "auth": "fas fa-users-cog",
+        "authentication.User": "fas fa-user-shield",
+        "authentication.OTPVerification": "fas fa-key",
+        "auth.Group": "fas fa-users",
+        "profiles.StudentProfile": "fas fa-user-graduate",
+        "profiles.EmployerProfile": "fas fa-building",
+        "jobs.Job": "fas fa-briefcase",
+        "ats_engine.Application": "fas fa-file-signature",
+    },
+    "default_icon_parents": "fas fa-folder",
+    "default_icon_children": "fas fa-circle",
+    "related_modal_active": True,
+    "custom_css": "css/custom_admin.css",
+    "custom_js": None,
+    "show_ui_builder": False,
+    "changeform_format": "horizontal_tabs",
+    "changeform_format_overrides": {"auth.user": "collapsible_list", "auth.group": "vertical_tabs"},
+}
+
+JAZZMIN_UI_TWEAKS = {
+    "navbar_small_text": True,
+    "footer_small_text": True,
+    "body_small_text": True,
+    "brand_small_text": True,
+    "brand_colour": False,
+    "accent": "accent-primary",
+    "navbar": "navbar-white navbar-light",
+    "no_navbar_border": True,
+    "navbar_fixed": True,
+    "layout_boxed": False,
+    "footer_fixed": False,
+    "sidebar_fixed": True,
+    "sidebar": "sidebar-dark-primary",
+    "sidebar_nav_small_text": True,
+    "sidebar_disable_expand": False,
+    "sidebar_nav_child_indent": True,
+    "sidebar_nav_compact_style": False,
+    "sidebar_remove_offset": False,
+    "sidebar_link_nav_small_text": True,
+}
 
 WSGI_APPLICATION = 'core.wsgi.application'
 
