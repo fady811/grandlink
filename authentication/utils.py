@@ -16,8 +16,8 @@ from django.utils.html import strip_tags
 def send_otp_email(user):
     """Create OTP and send stylized HTML email"""
     otp_code = generate_otp()
-    # Invalidate previous unused OTPs for this user
-    OTPVerification.objects.filter(user=user, is_used=False).update(is_used=True)
+    # Remove previous unused OTPs for this user
+    OTPVerification.objects.filter(user=user).delete()
     otp = OTPVerification.objects.create(
         user=user,
         code=otp_code,
@@ -67,8 +67,7 @@ def verify_otp(email, code):
         return False, "Invalid code."
 
     # Success
-    otp.is_used = True
-    otp.save()
+    otp.delete()
     user.is_active = True
     user.save()
     return True, "Email verified successfully."
