@@ -11,8 +11,8 @@
     --text-main: #0f172a;
     --text-muted: #64748b;
     --border-color: #e2e8f0;
-    --border-radius-sm: 6px;
-    --border-radius-md: 8px;
+    --border-radius-sm: 4px;
+    --border-radius-md: 6px;
     --card-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
 }
 
@@ -28,7 +28,44 @@ body {
 /* --- Sidebar Optimization --- */
 .main-sidebar {
     background-color: var(--sidebar-bg) !important;
+}
+
+/* Default Sidebar Width */
+.main-sidebar,
+.main-sidebar::before {
     width: 260px !important;
+}
+
+/* Fixed Collapsed Width - Prevents Expand on Hover */
+.sidebar-collapse .main-sidebar,
+.sidebar-collapse .main-sidebar::before {
+    width: 4.6rem !important;
+}
+
+/* Hidden elements in collapsed state */
+.sidebar-collapse .brand-text,
+.sidebar-collapse .user-panel .info,
+.sidebar-collapse .nav-sidebar .nav-link p,
+.sidebar-collapse .nav-sidebar .nav-link .right,
+.sidebar-collapse .nav-header {
+    display: none !important;
+}
+
+/* Forcefully prevent menu from opening or showing tooltips on hover when collapsed */
+.sidebar-collapse .main-sidebar .nav-sidebar .nav-item:hover>.nav-link p,
+.sidebar-collapse .main-sidebar .nav-sidebar .nav-item:hover>.nav-treeview {
+    display: none !important;
+    opacity: 0 !important;
+    visibility: hidden !important;
+}
+
+/* Navigation Header Styling */
+.nav-header {
+    font-size: 0.7rem !important;
+    text-transform: uppercase !important;
+    letter-spacing: 1px !important;
+    color: #475569 !important;
+    padding: 1rem 1.5rem 0.5rem !important;
 }
 
 /* Fix Email/Username in Sidebar */
@@ -55,9 +92,34 @@ body {
     color: #cbd5e1 !important;
 }
 
+/* Fix icon centering when collapsed */
+.sidebar-collapse .nav-sidebar .nav-item .nav-link {
+    margin: 2px 0 !important;
+    text-align: center !important;
+}
+
+.sidebar-collapse .nav-sidebar .nav-link i {
+    margin-right: 0 !important;
+}
+
 .brand-link {
     padding: 0.8rem 1rem !important;
     border-bottom: 1px solid rgba(255, 255, 255, 0.05) !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    display: flex !important;
+    align-items: center !important;
+}
+
+.brand-link .brand-image {
+    margin-left: 0.5rem !important;
+    margin-right: 0.5rem !important;
+}
+
+/* Ensure Logo is centered when collapsed */
+.sidebar-collapse .brand-link {
+    padding: 0.8rem 0.5rem !important;
+    justify-content: center !important;
 }
 
 .brand-text {
