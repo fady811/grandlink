@@ -93,17 +93,20 @@ TEMPLATES = [
 
 JAZZMIN_SETTINGS = {
     "site_title": "GradLink Admin",
-    "site_header": "GradLink",
-    "site_brand": "GradLink",
-    "site_logo_icons": "fas fa-shield-alt",
-    "welcome_sign": "GradLink Management System",
+    "site_header": "",
+    "site_brand": "  ",
+    "site_logo": "logo.png",
+    "login_logo": "logo.png",
+    "site_logo_classes": "img-circle",
+    "welcome_sign": "Welcome to GradLink Management",
     "copyright": "GradLink Ltd",
-    "search_model": ["authentication.User"],
+    "search_model": ["authentication.User", "jobs.Job"],
     "user_avatar": None,
     # Top Menu
     "topmenu_links": [
         {"name": "Home", "url": "admin:index", "permissions": ["auth.view_user"]},
         {"model": "authentication.User"},
+        {"name": "Jobs", "url": "admin:jobs_job_changelist"},
     ],
     # Side Menu
     "show_sidebar": True,
@@ -119,7 +122,10 @@ JAZZMIN_SETTINGS = {
         "profiles.StudentProfile": "fas fa-user-graduate",
         "profiles.EmployerProfile": "fas fa-building",
         "jobs.Job": "fas fa-briefcase",
-        "ats_engine.Application": "fas fa-file-signature",
+        "jobs.Skill": "fas fa-tags",
+        "jobs.Application": "fas fa-file-signature",
+        "jobs.SavedJob": "fas fa-bookmark",
+        "ats_engine.Application": "fas fa-cogs",
     },
     "default_icon_parents": "fas fa-folder",
     "default_icon_children": "fas fa-circle",
@@ -127,30 +133,30 @@ JAZZMIN_SETTINGS = {
     "custom_css": "css/custom_admin.css",
     "custom_js": None,
     "show_ui_builder": False,
-    "changeform_format": "horizontal_tabs",
-    "changeform_format_overrides": {"auth.user": "collapsible_list", "auth.group": "vertical_tabs"},
+    "changeform_format": "single",
+    "changeform_format_overrides": {},
 }
 
 JAZZMIN_UI_TWEAKS = {
-    "navbar_small_text": True,
+    "navbar_small_text": False,
     "footer_small_text": True,
-    "body_small_text": True,
-    "brand_small_text": True,
+    "body_small_text": False,
+    "brand_small_text": False,
     "brand_colour": False,
-    "accent": "accent-primary",
+    "accent": "accent-indigo",
     "navbar": "navbar-white navbar-light",
     "no_navbar_border": True,
     "navbar_fixed": True,
     "layout_boxed": False,
     "footer_fixed": False,
     "sidebar_fixed": True,
-    "sidebar": "sidebar-dark-primary",
-    "sidebar_nav_small_text": True,
-    "sidebar_disable_expand": False,
+    "sidebar": "sidebar-dark-indigo",
+    "sidebar_nav_small_text": False,
+    "sidebar_disable_expand": True,
     "sidebar_nav_child_indent": True,
     "sidebar_nav_compact_style": False,
     "sidebar_remove_offset": False,
-    "sidebar_link_nav_small_text": True,
+    "sidebar_link_nav_small_text": False,
 }
 
 WSGI_APPLICATION = 'core.wsgi.application'
@@ -204,6 +210,8 @@ REST_FRAMEWORK = {
     'DEFAULT_RENDERER_CLASSES': (
         'rest_framework.renderers.JSONRenderer',
     ),
+    'DEFAULT_PAGINATION_CLASS': 'core.pagination.StandardPagination',
+    'PAGE_SIZE': 20,
 }
 
 # JWT settings
