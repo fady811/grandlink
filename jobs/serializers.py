@@ -41,8 +41,14 @@ class JobListSerializer(serializers.ModelSerializer):
         )
 
     def get_company_logo(self, obj):
-        """Placeholder for future company logo support."""
-        return None
+        """Return the employer's company logo URL if available."""
+        logo = obj.employer.logo if hasattr(obj.employer, 'logo') else None
+        if not logo:
+            return None
+        request = self.context.get('request')
+        if request:
+            return request.build_absolute_uri(logo.url)
+        return logo.url
 
     def get_is_saved(self, obj):
         """Check if the current student has saved this job."""

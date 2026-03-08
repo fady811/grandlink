@@ -8,6 +8,9 @@ from authentication.models import User
 
 class IsOwnerOrAdmin(permissions.BasePermission):
     def has_object_permission(self, request, view, obj):
+        # Allow viewing for any authenticated user, but restrict editing to owner/staff
+        if request.method in permissions.SAFE_METHODS:
+            return True
         return request.user.is_staff or obj.user == request.user
 
 class StudentProfileDetailView(generics.RetrieveUpdateAPIView):

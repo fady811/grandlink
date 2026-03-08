@@ -49,12 +49,15 @@ INSTALLED_APPS = [
     # Third-party
     'rest_framework',
     'rest_framework_simplejwt',
+    'rest_framework_simplejwt.token_blacklist',
     'corsheaders',
+    'drf_spectacular',
 
     # Local
     'authentication',
     'profiles',
     'jobs',
+    'interviews',
     'ats_engine',
 ]
 
@@ -113,7 +116,7 @@ JAZZMIN_SETTINGS = {
     "navigation_expanded": True,
     "hide_apps": [],
     "hide_models": [],
-    "order_with_respect_to": ["authentication", "profiles", "jobs", "ats_engine"],
+    "order_with_respect_to": ["authentication", "profiles", "jobs", "interviews", "ats_engine"],
     "icons": {
         "auth": "fas fa-users-cog",
         "authentication.User": "fas fa-user-shield",
@@ -125,6 +128,8 @@ JAZZMIN_SETTINGS = {
         "jobs.Skill": "fas fa-tags",
         "jobs.Application": "fas fa-file-signature",
         "jobs.SavedJob": "fas fa-bookmark",
+        "interviews.Interview": "fas fa-calendar-check",
+        "interviews.InterviewFeedback": "fas fa-star-half-alt",
         "ats_engine.Application": "fas fa-cogs",
     },
     "default_icon_parents": "fas fa-folder",
@@ -212,6 +217,18 @@ REST_FRAMEWORK = {
     ),
     'DEFAULT_PAGINATION_CLASS': 'core.pagination.StandardPagination',
     'PAGE_SIZE': 20,
+    # ── Throttling ───────────────────────────────────────────────
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle',
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': '20/minute',          # unauthenticated (covers public auth endpoints)
+        'user': '100/minute',         # any authenticated user
+        'auth': '5/minute',           # login / register / password-reset
+    },
+    # ── Schema (drf-spectacular) ─────────────────────────────────
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }
 
 # JWT settings
@@ -239,9 +256,19 @@ EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD', default='')
 # Redis (for OTP caching, optional fallback to database)
 REDIS_URL = env('REDIS_URL', default='redis://localhost:6379/0')
 
-# Celery (optional)
+# Celery
 CELERY_BROKER_URL = REDIS_URL
 CELERY_RESULT_BACKEND = REDIS_URL
+CELERY_TIMEZONE = 'UTC'
+
+from celery.schedules import crontab
+CELERY_BEAT_SCHEDULE = {
+    # Run every day at midnight UTC to expire stale job postings
+    'expire-stale-jobs-daily': {
+        'task': 'jobs.tasks.expire_stale_jobs',
+        'schedule': crontab(hour=0, minute=0),
+    },
+}
 
 # OTP settings
 OTP_EXPIRE_MINUTES = 50

@@ -14,43 +14,77 @@ from django.template.loader import render_to_string
 from django.utils.html import strip_tags
 
 def send_otp_email(user):
-    """Create OTP and send stylized HTML email"""
+    """Create OTP and send stylized HTML email (email verification)"""
     otp_code = generate_otp()
-    # Remove previous unused OTPs for this user
-    OTPVerification.objects.filter(user=user).delete()
-    otp = OTPVerification.objects.create(
+    # Remove previous unused OTPs for this user + purpose
+    OTPVerification.objects.filter(
+        user=user, purpose=OTPVerification.Purpose.VERIFY_EMAIL
+    ).delete()
+    OTPVerification.objects.create(
         user=user,
         code=otp_code,
-        expires_at=timezone.now() + timedelta(minutes=settings.OTP_EXPIRE_MINUTES)
+        purpose=OTPVerification.Purpose.VERIFY_EMAIL,
+        expires_at=timezone.now() + timedelta(minutes=settings.OTP_EXPIRE_MINUTES),
     )
-    
-    # Context for the template
+
     context = {
         'user': user,
         'otp_code': otp_code,
         'expiry_minutes': settings.OTP_EXPIRE_MINUTES,
     }
-    
-    # Render HTML and create plain text version
+
     html_message = render_to_string('emails/otp_email.html', context)
     plain_message = strip_tags(html_message)
-    
-    subject = 'Your GradLink Verification Code'
-    
+
     send_mail(
-        subject,
+        'Your GradLink Verification Code',
         plain_message,
         settings.DEFAULT_FROM_EMAIL,
         [user.email],
-        html_message=html_message
+        html_message=html_message,
     )
-    return otp
 
-def verify_otp(email, code):
-    """Validate OTP and activate user if correct"""
+
+def send_password_reset_otp(user):
+    """Create OTP and send password reset email"""
+    otp_code = generate_otp()
+    # Remove previous reset OTPs for this user
+    OTPVerification.objects.filter(
+        user=user, purpose=OTPVerification.Purpose.RESET_PASSWORD
+    ).delete()
+    OTPVerification.objects.create(
+        user=user,
+        code=otp_code,
+        purpose=OTPVerification.Purpose.RESET_PASSWORD,
+        expires_at=timezone.now() + timedelta(minutes=settings.OTP_EXPIRE_MINUTES),
+    )
+
+    context = {
+        'user': user,
+        'otp_code': otp_code,
+        'expiry_minutes': settings.OTP_EXPIRE_MINUTES,
+        'purpose': 'password reset',
+    }
+
+    html_message = render_to_string('emails/otp_email.html', context)
+    plain_message = strip_tags(html_message)
+
+    send_mail(
+        'Your GradLink Password Reset Code',
+        plain_message,
+        settings.DEFAULT_FROM_EMAIL,
+        [user.email],
+        html_message=html_message,
+    )
+
+
+def verify_otp(email, code, purpose=OTPVerification.Purpose.VERIFY_EMAIL):
+    """Validate OTP for a given purpose. Activates user on email-verification success."""
     try:
         user = User.objects.get(email=email)
-        otp = OTPVerification.objects.filter(user=user, is_used=False).latest('created_at')
+        otp = OTPVerification.objects.filter(
+            user=user, is_used=False, purpose=purpose
+        ).latest('created_at')
     except (User.DoesNotExist, OTPVerification.DoesNotExist):
         return False, "Invalid email or code."
 
@@ -66,8 +100,12 @@ def verify_otp(email, code):
     if otp.code != code:
         return False, "Invalid code."
 
-    # Success
+    # Success — clean up OTP
     otp.delete()
-    user.is_active = True
-    user.save()
-    return True, "Email verified successfully."
+
+    # Only activate user on email-verification purpose
+    if purpose == OTPVerification.Purpose.VERIFY_EMAIL:
+        user.is_active = True
+        user.save()
+
+    return True, "Verified successfully."

@@ -74,10 +74,20 @@ class User(AbstractUser):
 
 
 class OTPVerification(models.Model):
-    """OTP codes for email verification"""
+    """OTP codes for email verification and password reset"""
+
+    class Purpose(models.TextChoices):
+        VERIFY_EMAIL = 'verify_email', 'Verify Email'
+        RESET_PASSWORD = 'reset_password', 'Reset Password'
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='otps')
     code = models.CharField(max_length=6)
+    purpose = models.CharField(
+        max_length=20,
+        choices=Purpose.choices,
+        default=Purpose.VERIFY_EMAIL,
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     expires_at = models.DateTimeField()
     is_used = models.BooleanField(default=False)
