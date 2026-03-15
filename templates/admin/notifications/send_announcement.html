@@ -1,0 +1,62 @@
+{% extends "admin/base_site.html" %}
+{% load i18n admin_urls static %}
+
+{% block extrahead %}
+    {{ block.super }}
+    <style>
+        .announcement-form { max-width: 800px; margin: 20px 0; }
+        .form-row { margin-bottom: 20px; }
+        .form-row label { display: block; font-weight: bold; margin-bottom: 8px; color: #444; }
+        .form-row input[type="text"], .form-row textarea { 
+            width: 100%; border: 1px solid #ccc; border-radius: 4px; padding: 10px; font-size: 14px;
+        }
+        .user-list { 
+            margin: 20px 0; padding: 15px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #6366f1;
+            max-height: 200px; overflow-y: auto;
+        }
+        .user-tag { 
+            display: inline-block; padding: 4px 10px; background: #eef2ff; color: #6366f1; 
+            border-radius: 4px; margin: 0 5px 5px 0; font-size: 12px; font-weight: 600;
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+    <div id="content-main">
+        <h1>Send Announcement</h1>
+        <p>You are about to send an announcement to <strong>{{ queryset.count }}</strong> selected users.</p>
+
+        <div class="user-list">
+            {% for user in queryset %}
+                <span class="user-tag">{{ user.email }}</span>
+            {% endfor %}
+        </div>
+
+        <form action="" method="post" class="announcement-form">
+            {% csrf_token %}
+            
+            {% for obj in queryset %}
+                <input type="hidden" name="{{ action_checkbox_name }}" value="{{ obj.pk }}" />
+            {% endfor %}
+
+            <input type="hidden" name="action" value="send_announcement" />
+            <input type="hidden" name="apply" value="yes" />
+
+            <div class="form-row">
+                <label for="id_subject">Email Subject:</label>
+                <input type="text" name="subject" id="id_subject" placeholder="e.g. System Maintenance Update" required />
+            </div>
+
+            <div class="form-row">
+                <label for="id_message">Announcement Message:</label>
+                <textarea name="message" id="id_message" rows="8" placeholder="Type your announcement here..." required></textarea>
+                <p class="help">This message will be saved as an in-app notification and sent via email.</p>
+            </div>
+
+            <div class="submit-row">
+                <input type="submit" value="{% trans 'Send Announcement Now' %}" class="default" />
+                <a href="#" onclick="window.history.back();" class="closelink">{% trans 'Cancel' %}</a>
+            </div>
+        </form>
+    </div>
+{% endblock %}

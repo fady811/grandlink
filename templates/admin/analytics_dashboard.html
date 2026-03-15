@@ -1,0 +1,423 @@
+{% extends "admin/base_site.html" %}
+{% load i18n static %}
+
+{% block extrahead %}
+{{ block.super }}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+    :root {
+        --primary: #3b82f6;
+        --secondary: #64748b;
+        --success: #10b981;
+        --warning: #f59e0b;
+        --danger: #ef4444;
+        --info: #8b5cf6;
+        --bg-soft: #f8fafc;
+        --border-soft: rgba(0,0,0,0.05);
+    }
+
+    .analytics-dashboard {
+        padding: 1.5rem;
+        background: #f1f5f9;
+        min-height: 100vh;
+    }
+
+    /* Header & Filter */
+    .dashboard-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 2rem;
+    }
+
+    .filter-group {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        background: #fff;
+        padding: 0.5rem 1rem;
+        border-radius: 0.75rem;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+
+    .filter-label {
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: var(--secondary);
+    }
+
+    .filter-select {
+        border: 1px solid #e2e8f0;
+        padding: 0.4rem 2rem 0.4rem 1rem;
+        border-radius: 0.5rem;
+        font-size: 0.875rem;
+        color: #1e293b;
+        cursor: pointer;
+        background-color: #fff;
+    }
+
+    /* KPI Cards Grid */
+    .kpi-row {
+        display: flex;
+        flex-wrap: wrap;
+        margin: -0.75rem;
+        margin-bottom: 2rem;
+    }
+
+    .kpi-col {
+        padding: 0.75rem;
+        flex: 1 1 100%;
+    }
+
+    @media (min-width: 576px) { .kpi-col { flex: 0 0 50%; } }
+    @media (min-width: 1200px) { .kpi-col { flex: 0 0 25%; } }
+
+    .stat-card {
+        background: #fff;
+        border-radius: 1rem;
+        padding: 1.5rem;
+        height: 100%;
+        position: relative;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+        border: 1px solid var(--border-soft);
+    }
+
+    .stat-card:hover { transform: translateY(-4px); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); }
+
+    .stat-icon {
+        width: 3rem;
+        height: 3rem;
+        border-radius: 0.75rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.25rem;
+        margin-bottom: 1rem;
+    }
+
+    .icon-users { background: #eff6ff; color: var(--primary); }
+    .icon-jobs { background: #ecfdf5; color: var(--success); }
+    .icon-eng { background: #fffbeb; color: var(--warning); }
+    .icon-ints { background: #f5f3ff; color: var(--info); }
+
+    .stat-label { font-size: 0.875rem; color: var(--secondary); font-weight: 500; margin-bottom: 0.25rem; }
+    .stat-value { font-size: 2rem; font-weight: 800; color: #1e293b; margin-bottom: 0.5rem; }
+
+    /* Charts Grid */
+    .charts-row {
+        display: flex;
+        flex-wrap: wrap;
+        margin: -1rem;
+        margin-bottom: 2rem;
+    }
+
+    .chart-col {
+        padding: 1rem;
+        flex: 1 1 100%;
+    }
+
+    @media (min-width: 992px) { .chart-col { flex: 0 0 50%; } }
+
+    .chart-card {
+        background: #fff;
+        border-radius: 1rem;
+        padding: 1.5rem;
+        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+        border: 1px solid var(--border-soft);
+        height: 100%;
+    }
+
+    .chart-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1.5rem;
+    }
+
+    .chart-title { font-size: 1.125rem; font-weight: 700; color: #1e293b; }
+
+    .canvas-wrapper {
+        position: relative;
+        height: 300px;
+        width: 100%;
+    }
+
+    /* Tables */
+    .tables-row {
+        display: flex;
+        flex-wrap: wrap;
+        margin: -1rem;
+    }
+
+    .table-col {
+        padding: 1rem;
+        flex: 1 1 100%;
+    }
+
+    @media (min-width: 992px) { .table-col { flex: 0 0 50%; } }
+
+    .table-card {
+        background: #fff;
+        border-radius: 1rem;
+        overflow: hidden;
+        box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+        border: 1px solid var(--border-soft);
+    }
+
+    .table-header {
+        padding: 1.25rem 1.5rem;
+        background: var(--bg-soft);
+        border-bottom: 1px solid #e2e8f0;
+        font-weight: 700;
+        color: #1e293b;
+    }
+
+    .modern-table { width: 100%; border-collapse: collapse; }
+    .modern-table th { background: #f8fafc; padding: 0.75rem 1.5rem; text-align: left; font-size: 0.75rem; color: var(--secondary); text-transform: uppercase; }
+    .modern-table td { padding: 1rem 1.5rem; border-bottom: 1px solid #f1f5f9; font-size: 0.875rem; color: #334155; }
+    .modern-table tr:last-child td { border-bottom: none; }
+    
+    .badge-soft {
+        padding: 0.25rem 0.75rem;
+        border-radius: 999px;
+        font-weight: 600;
+        font-size: 0.75rem;
+        background: #f1f5f9;
+        color: #475569;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="analytics-dashboard">
+    
+    <div class="dashboard-header">
+        <h1 style="font-weight: 800; color: #1e293b; margin: 0;">Analytics Overview</h1>
+        <div class="filter-group">
+            <span class="filter-label"><i class="fas fa-calendar-alt"></i> Timeframe:</span>
+            <select class="filter-select" id="timeFilter" onchange="updateTimeframe(this.value)">
+                <option value="7" {% if current_days == 7 %}selected{% endif %}>Last 7 Days</option>
+                <option value="30" {% if current_days == 30 %}selected{% endif %}>Last 30 Days</option>
+                <option value="90" {% if current_days == 90 %}selected{% endif %}>Last 90 Days</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- KPI Cards -->
+    <div class="kpi-row">
+        <div class="kpi-col">
+            <div class="stat-card">
+                <div class="stat-icon icon-users"><i class="fas fa-users"></i></div>
+                <div class="stat-label">Total Users</div>
+                <div class="stat-value">{{ users.total_students|add:users.total_employers }}</div>
+                <div style="font-size: 0.8rem; color: var(--secondary);">
+                    <b>{{ users.active_period }}</b> active in this period
+                </div>
+            </div>
+        </div>
+        <div class="kpi-col">
+            <div class="stat-card">
+                <div class="stat-icon icon-jobs"><i class="fas fa-briefcase"></i></div>
+                <div class="stat-label">Active Jobs</div>
+                <div class="stat-value">{{ jobs.total_active }}</div>
+                <div style="font-size: 0.8rem; color: var(--secondary);">
+                    <b>{{ jobs.posted_period }}</b> posted in this period
+                </div>
+            </div>
+        </div>
+        <div class="kpi-col">
+            <div class="stat-card">
+                <div class="stat-icon icon-eng"><i class="fas fa-paper-plane"></i></div>
+                <div class="stat-label">Applications</div>
+                <div class="stat-value">{{ applications.total }}</div>
+                <div style="font-size: 0.8rem; color: var(--secondary);">
+                    <b>{{ applications.submitted_period }}</b> submitted in this period
+                </div>
+            </div>
+        </div>
+        <div class="kpi-col">
+            <div class="stat-card">
+                <div class="stat-icon icon-ints"><i class="fas fa-calendar-check"></i></div>
+                <div class="stat-label">Upcoming Interviews</div>
+                <div class="stat-value">{{ interviews.upcoming }}</div>
+                <div style="font-size: 0.8rem; color: var(--secondary);">
+                    Across <b>{{ interviews.total }}</b> total sessions
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Row 1 -->
+    <div class="charts-row">
+        <div class="chart-col">
+            <div class="chart-card">
+                <div class="chart-header"><span class="chart-title">Job Creation Trend</span></div>
+                <div class="canvas-wrapper"><canvas id="trendChart"></canvas></div>
+            </div>
+        </div>
+        <div class="chart-col">
+            <div class="chart-card">
+                <div class="chart-header"><span class="chart-title">Job Status Distribution</span></div>
+                <div class="canvas-wrapper"><canvas id="statusChart"></canvas></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Row 2 -->
+    <div class="charts-row">
+        <div class="chart-col">
+            <div class="chart-card">
+                <div class="chart-header"><span class="chart-title">Applications per Job (Top 5)</span></div>
+                <div class="canvas-wrapper"><canvas id="topJobsChart"></canvas></div>
+            </div>
+        </div>
+        <div class="chart-col">
+            <div class="chart-card">
+                <div class="chart-header"><span class="chart-title">Top Employers by Job Posts</span></div>
+                <div class="canvas-wrapper"><canvas id="topEmployersChart"></canvas></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tables Row -->
+    <div class="tables-row">
+        <div class="table-col">
+            <div class="table-card">
+                <div class="table-header">Top 5 Employers Detail</div>
+                <table class="modern-table">
+                    <thead><tr><th>Company</th><th>Industry</th><th>Jobs</th></tr></thead>
+                    <tbody>
+                        {% for emp in top_employers %}
+                        <tr>
+                            <td style="font-weight: 600;">{{ emp.company_name }}</td>
+                            <td>{{ emp.industry|default:"-" }}</td>
+                            <td><span class="badge-soft">{{ emp.job_count }}</span></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="table-col">
+            <div class="table-card">
+                <div class="table-header">Top 5 Popular Jobs Detail</div>
+                <table class="modern-table">
+                    <thead><tr><th>Title</th><th>Company</th><th>Apps</th></tr></thead>
+                    <tbody>
+                        {% for job in top_jobs %}
+                        <tr>
+                            <td style="font-weight: 600;">{{ job.title }}</td>
+                            <td>{{ job.company_name }}</td>
+                            <td><span class="badge-soft" style="background:var(--primary); color:#fff;">{{ job.app_count }}</span></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    const chartData = {{ charts|safe }};
+
+    function initCharts() {
+        // 1. Trend Line Chart
+        new Chart(document.getElementById('trendChart'), {
+            type: 'line',
+            data: {
+                labels: chartData.trend.labels,
+                datasets: [{
+                    label: 'New Jobs',
+                    data: chartData.trend.data,
+                    borderColor: '#3b82f6',
+                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                    fill: true,
+                    tension: 0.4,
+                    pointRadius: 4,
+                    pointHoverRadius: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: { 
+                    y: { beginAtZero: true, grid: { borderDash: [5, 5] } },
+                    x: { grid: { display: false } }
+                }
+            }
+        });
+
+        // 2. Status Doughnut Chart
+        new Chart(document.getElementById('statusChart'), {
+            type: 'doughnut',
+            data: {
+                labels: chartData.status.labels,
+                datasets: [{
+                    data: chartData.status.data,
+                    backgroundColor: ['#10b981', '#f59e0b', '#ef4444', '#64748b', '#3b82f6', '#8b5cf6'],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { position: 'right' } },
+                cutout: '70%'
+            }
+        });
+
+        // 3. Top Jobs Bar Chart
+        new Chart(document.getElementById('topJobsChart'), {
+            type: 'bar',
+            data: {
+                labels: chartData.top_jobs.labels,
+                datasets: [{
+                    label: 'Applications',
+                    data: chartData.top_jobs.data,
+                    backgroundColor: '#8b5cf6',
+                    borderRadius: 6
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: { x: { beginAtZero: true } }
+            }
+        });
+
+        // 4. Top Employers Bar Chart
+        new Chart(document.getElementById('topEmployersChart'), {
+            type: 'bar',
+            data: {
+                labels: chartData.top_employers.labels,
+                datasets: [{
+                    label: 'Jobs Posted',
+                    data: chartData.top_employers.data,
+                    backgroundColor: '#10b981',
+                    borderRadius: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: { y: { beginAtZero: true } }
+            }
+        });
+    }
+
+    function updateTimeframe(days) {
+        const url = new URL(window.location.href);
+        url.searchParams.set('days', days);
+        window.location.href = url.toString();
+    }
+
+    document.addEventListener('DOMContentLoaded', initCharts);
+</script>
+{% endblock %}

@@ -85,7 +85,7 @@ class UserAdmin(BaseUserAdmin):
         return '—'
 
     # ── Actions ──────────────────────────────────────────────────
-    actions = ['activate_users', 'deactivate_users']
+    actions = ['activate_users', 'deactivate_users', 'send_announcement']
 
     @admin.action(description='✅ Activate selected users')
     def activate_users(self, request, queryset):
@@ -96,6 +96,39 @@ class UserAdmin(BaseUserAdmin):
     def deactivate_users(self, request, queryset):
         count = queryset.update(is_active=False)
         self.message_user(request, f'{count} user(s) deactivated.')
+
+
+    @admin.action(description='📢 Send announcement to selected users')
+    def send_announcement(self, request, queryset):
+        """
+        Intermediate page for sending announcements.
+        """
+        from django.template.response import TemplateResponse
+        from notifications.tasks import send_bulk_announcement
+
+        if 'apply' in request.POST:
+            subject = request.POST.get('subject', '').strip()
+            message = request.POST.get('message', '').strip()
+            
+            if not subject or not message:
+                self.message_user(request, "Subject and message are required.", level='error')
+                return None
+
+            user_ids = list(queryset.values_list('pk', flat=True))
+            send_bulk_announcement.delay(user_ids, subject, message)
+            
+            self.message_user(request, f"Announcement started for {len(queryset)} users.")
+            return None
+
+        return TemplateResponse(
+            request,
+            'admin/notifications/send_announcement.html',
+            context={
+                'queryset': queryset,
+                'action_checkbox_name': admin.helpers.ACTION_CHECKBOX_NAME,
+                **self.admin_site.each_context(request),
+            }
+        )
 
 
 @admin.register(OTPVerification)

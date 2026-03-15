@@ -53,12 +53,28 @@ class IsApplicationOwnerOrJobOwner(permissions.BasePermission):
     def has_object_permission(self, request, view, obj):
         user = request.user
         # Student who applied
-        if user.role == 'student' and obj.student.user == user:
+        if getattr(user, 'role', None) == 'student' and obj.student.user == user:
             return True
         # Employer who owns the job
-        if user.role == 'employer' and obj.job.employer.user == user:
+        if getattr(user, 'role', None) == 'employer' and obj.job.employer.user == user:
             return True
         # Admin
-        if user.is_staff:
+        if getattr(user, 'is_staff', False):
             return True
         return False
+
+
+class IsNotJobOwner(permissions.BasePermission):
+    """
+    Prevents an employer from reporting their own job.
+    """
+    message = 'You cannot report your own job posting.'
+
+    def has_object_permission(self, request, view, obj):
+        # obj could be a Job or something linking to a job
+        job = obj.job if hasattr(obj, 'job') else obj
+        
+        if getattr(request.user, 'role', None) == 'employer' and job.employer.user == request.user:
+            return False
+            
+        return True

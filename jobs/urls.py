@@ -2,10 +2,14 @@ from django.urls import path
 from .views import (
     # Skills
     SkillListView,
+    # Categories
+    JobCategoryListView,
     # Jobs
     JobListCreateView,
     JobDetailView,
     MyJobsListView,
+    SubmitForReviewView,
+    ReportJobView,
     # Applications
     ApplyToJobView,
     MyApplicationsListView,
@@ -20,6 +24,9 @@ from .views import (
 )
 
 urlpatterns = [
+    # ── Categories ───────────────────────────────────────────────
+    path('categories/', JobCategoryListView.as_view(), name='category-list'),
+
     # ── Skills ───────────────────────────────────────────────────
     path('skills/', SkillListView.as_view(), name='skill-list'),
 
@@ -27,6 +34,8 @@ urlpatterns = [
     path('', JobListCreateView.as_view(), name='job-list-create'),
     path('<uuid:pk>/', JobDetailView.as_view(), name='job-detail'),
     path('my-jobs/', MyJobsListView.as_view(), name='my-jobs'),
+    path('<uuid:pk>/submit-for-review/', SubmitForReviewView.as_view(), name='submit-for-review'),
+    path('<uuid:pk>/report/', ReportJobView.as_view(), name='report-job'),
 
     # ── Applications ─────────────────────────────────────────────
     path('<uuid:job_id>/apply/', ApplyToJobView.as_view(), name='apply-to-job'),

@@ -58,20 +58,28 @@ class StudentProfileAdmin(admin.ModelAdmin):
 
     @admin.display(description='Skills')
     def skills_preview(self, obj):
-        if not obj.skills:
+        skills_qs = obj.skills.all()
+        if not skills_qs.exists():
             return '—'
-        skills = obj.skills[:3]  # Show first 3
-        parts = []
-        for s in skills:
-            parts.append(
+        
+        from django.utils.safestring import mark_safe
+        
+        skills_list = list(skills_qs[:3])  # Show first 3
+        parts = [
+            format_html(
                 '<span style="background:#eef2ff; color:#4f46e5; padding:2px 8px; '
                 'border-radius:10px; font-size:0.7rem; font-weight:500; '
-                'margin-right:3px;">{}</span>'.format(s)
-            )
-        extra = len(obj.skills) - 3
+                'margin-right:3px;">{}</span>',
+                s.name
+            ) for s in skills_list
+        ]
+        
+        total_count = skills_qs.count()
+        extra = total_count - 3
         if extra > 0:
-            parts.append('<span style="color:#9ca3af; font-size:0.72rem;">+{}</span>'.format(extra))
-        return format_html('{}', ' '.join(parts))
+            parts.append(format_html('<span style="color:#9ca3af; font-size:0.72rem;">+{}</span>', extra))
+            
+        return mark_safe(' '.join(parts))
 
     @admin.display(description='Privacy')
     def privacy_status(self, obj):

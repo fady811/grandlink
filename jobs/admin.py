@@ -1,8 +1,11 @@
 from django.contrib import admin
 from django.utils.html import format_html
 from django.utils import timezone
-from django.db.models import Count
-from .models import Skill, Job, Application, SavedJob
+from django.db.models import Count, Q
+from django.template.response import TemplateResponse
+from django.http import HttpResponseRedirect
+from .models import Skill, Job, Application, SavedJob, JobReport, JobCategory
+from .services import approve_job, reject_job, resolve_job_report
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -14,6 +17,19 @@ class ApplicationInline(admin.TabularInline):
     model = Application
     fields = ('student', 'status', 'applied_at')
     readonly_fields = ('student', 'applied_at')
+    extra = 0
+    show_change_link = True
+    can_delete = False
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+
+class JobReportInline(admin.TabularInline):
+    """Show pending reports on the Job detail page."""
+    model = JobReport
+    fields = ('reporter', 'reason', 'status', 'created_at')
+    readonly_fields = ('reporter', 'reason', 'status', 'created_at')
     extra = 0
     show_change_link = True
     can_delete = False
@@ -64,6 +80,17 @@ class SkillAdmin(admin.ModelAdmin):
             '<span style="font-weight:600; color:#4f46e5;">{}</span>', count,
         )
 
+@admin.register(JobCategory)
+class JobCategoryAdmin(admin.ModelAdmin):
+    list_display = ('name', 'slug', 'is_active', 'jobs_count', 'created_at')
+    list_filter = ('is_active',)
+    search_fields = ('name', 'description')
+    prepopulated_fields = {'slug': ('name',)}
+    ordering = ('name',)
+
+    def jobs_count(self, obj):
+        return obj.jobs.count()
+    jobs_count.short_description = 'Job Posts'
 
 # ═══════════════════════════════════════════════════════════════
 #  JOB ADMIN
@@ -71,23 +98,26 @@ class SkillAdmin(admin.ModelAdmin):
 
 @admin.register(Job)
 class JobAdmin(admin.ModelAdmin):
-    """Rich Job management with status badges & inline applications."""
+    """Rich Job management with approval workflow, status badges & inline applications."""
 
     # ── List View ────────────────────────────────────────────────
     list_display = (
-        'title', 'employer', 'work_type_badge', 'experience_badge',
-        'status_badge', 'deadline_display',
+        'title', 'employer', 'category', 'is_flagged', 'flag_count_badge', 'work_type_badge', 
+        'experience_badge', 'status_badge', 'deadline_display',
         'apps_count', 'views_count', 'created_at',
     )
-    list_filter = ('status', 'work_type', 'experience_level', 'is_remote', 'hide_salary')
+    list_filter = ('is_flagged', 'status', 'work_type', 'experience_level', 'is_remote', 'hide_salary')
     search_fields = ('title', 'description', 'employer__company_name', 'location')
-    readonly_fields = ('id', 'views_count', 'created_at', 'updated_at', 'apps_count_detail')
+    readonly_fields = (
+        'id', 'is_flagged', 'views_count', 'created_at', 'updated_at', 'apps_count_detail',
+        'reviewed_by', 'reviewed_at', 'submitted_at',
+    )
     filter_horizontal = ('skills',)
     date_hierarchy = 'created_at'
     ordering = ('-created_at',)
     list_per_page = 25
     list_select_related = ('employer',)
-    inlines = [ApplicationInline]
+    inlines = [ApplicationInline, JobReportInline]
 
     # ── Detail View ──────────────────────────────────────────────
     fieldsets = (
@@ -95,7 +125,7 @@ class JobAdmin(admin.ModelAdmin):
             'fields': ('id', 'employer', 'title', 'description', 'requirements', 'responsibilities'),
         }),
         ('Classification', {
-            'fields': ('work_type', 'experience_level', 'skills'),
+            'fields': ('category', 'work_type', 'experience_level', 'skills'),
         }),
         ('Location', {
             'fields': ('location', 'is_remote'),
@@ -104,7 +134,11 @@ class JobAdmin(admin.ModelAdmin):
             'fields': ('salary_min', 'salary_max', 'hide_salary'),
         }),
         ('Status & Deadline', {
-            'fields': ('status', 'deadline'),
+            'fields': ('status', 'is_flagged', 'deadline'),
+        }),
+        ('Review', {
+            'fields': ('reviewed_by', 'reviewed_at', 'submitted_at', 'rejection_reason'),
+            'classes': ('collapse',),
         }),
         ('Analytics', {
             'fields': ('views_count', 'apps_count_detail', 'created_at', 'updated_at'),
@@ -114,9 +148,22 @@ class JobAdmin(admin.ModelAdmin):
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
-        return qs.select_related('employer').annotate(num_apps=Count('applications'))
+        return qs.select_related('employer').annotate(
+            num_apps=Count('applications', distinct=True),
+            pending_reports=Count('reports', filter=Q(reports__status=JobReport.Status.PENDING), distinct=True)
+        )
 
     # ── Custom Columns ───────────────────────────────────────────
+    @admin.display(description='Reports', ordering='pending_reports')
+    def flag_count_badge(self, obj):
+        count = obj.pending_reports
+        if count == 0:
+            return '—'
+        color = '#dc2626' if count >= 5 else '#b45309'
+        return format_html(
+            '<span style="color:{}; font-weight:bold;">{}</span>',
+            color, count
+        )
     @admin.display(description='Type')
     def work_type_badge(self, obj):
         colors = {
@@ -144,6 +191,7 @@ class JobAdmin(admin.ModelAdmin):
     def status_badge(self, obj):
         colors = {
             'draft': ('#6b7280', '#f3f4f6', '📝'),
+            'pending_review': ('#b45309', '#fef3c7', '🔍'),
             'active': ('#059669', '#ecfdf5', '🟢'),
             'paused': ('#d97706', '#fffbeb', '⏸️'),
             'closed': ('#dc2626', '#fef2f2', '🔴'),
@@ -188,21 +236,71 @@ class JobAdmin(admin.ModelAdmin):
         return obj.applications.count()
 
     # ── Actions ──────────────────────────────────────────────────
-    actions = ['make_active', 'make_paused', 'make_closed']
+    actions = ['approve_jobs', 'reject_jobs', 'make_paused', 'make_closed']
 
-    @admin.action(description='🟢 Set status to Active')
-    def make_active(self, request, queryset):
-        count = queryset.update(status=Job.Status.ACTIVE)
-        self.message_user(request, f'{count} job(s) set to Active.')
+    @admin.action(description='✅ Approve selected jobs (pending → active)')
+    def approve_jobs(self, request, queryset):
+        pending = queryset.filter(status=Job.Status.PENDING_REVIEW)
+        skipped = queryset.exclude(status=Job.Status.PENDING_REVIEW).count()
+        approved_count = 0
+
+        for job in pending.select_related('employer__user'):
+            approve_job(job, request.user)
+            approved_count += 1
+
+        msg = f'{approved_count} job(s) approved.'
+        if skipped:
+            msg += f' {skipped} job(s) skipped (not pending review).'
+        self.message_user(request, msg)
+
+    @admin.action(description='❌ Reject selected jobs (pending → draft)')
+    def reject_jobs(self, request, queryset):
+        pending = queryset.filter(status=Job.Status.PENDING_REVIEW)
+
+        if not pending.exists():
+            self.message_user(request, 'No pending review jobs selected.', level='warning')
+            return
+
+        # If the form was submitted with a rejection reason
+        if 'apply' in request.POST:
+            reason = request.POST.get('rejection_reason', '').strip()
+            if not reason:
+                self.message_user(request, 'Rejection reason is required.', level='error')
+                return
+
+            rejected_count = 0
+            for job in pending.select_related('employer__user'):
+                reject_job(job, request.user, reason)
+                rejected_count += 1
+
+            self.message_user(request, f'{rejected_count} job(s) rejected.')
+            return HttpResponseRedirect(request.get_full_path())
+
+        # Show intermediate confirmation page
+        return TemplateResponse(
+            request,
+            'admin/jobs/reject_intermediate.html',
+            context={
+                **self.admin_site.each_context(request),
+                'title': 'Reject Jobs',
+                'jobs': pending.select_related('employer'),
+                'action_checkbox_name': admin.helpers.ACTION_CHECKBOX_NAME,
+                'opts': self.model._meta,
+            },
+        )
 
     @admin.action(description='⏸️ Set status to Paused')
     def make_paused(self, request, queryset):
-        count = queryset.update(status=Job.Status.PAUSED)
+        count = queryset.filter(
+            status__in=[Job.Status.ACTIVE, Job.Status.PENDING_REVIEW]
+        ).update(status=Job.Status.PAUSED)
         self.message_user(request, f'{count} job(s) paused.')
 
     @admin.action(description='🔴 Set status to Closed')
     def make_closed(self, request, queryset):
-        count = queryset.update(status=Job.Status.CLOSED)
+        count = queryset.exclude(
+            status__in=[Job.Status.CLOSED, Job.Status.EXPIRED]
+        ).update(status=Job.Status.CLOSED)
         self.message_user(request, f'{count} job(s) closed.')
 
 
@@ -319,3 +417,75 @@ class SavedJobAdmin(admin.ModelAdmin):
     @admin.display(description='Job', ordering='job__title')
     def get_job_title(self, obj):
         return obj.job.title
+
+
+# ═══════════════════════════════════════════════════════════════
+#  JOB REPORT ADMIN
+# ═══════════════════════════════════════════════════════════════
+
+@admin.register(JobReport)
+class JobReportAdmin(admin.ModelAdmin):
+    list_display = ('job', 'get_employer', 'reason', 'status_badge', 'created_at')
+    list_filter = ('status', 'reason', 'created_at')
+    search_fields = ('job__title', 'job__employer__company_name', 'details')
+    readonly_fields = ('job', 'reporter', 'created_at', 'updated_at')
+    ordering = ('-created_at',)
+    list_per_page = 30
+    list_select_related = ('job', 'job__employer', 'reporter')
+
+    fieldsets = (
+        ('Report Details', {
+            'fields': ('job', 'reporter', 'reason', 'details')
+        }),
+        ('Administration', {
+            'fields': ('status', 'created_at', 'updated_at')
+        })
+    )
+
+    @admin.display(description='Employer', ordering='job__employer__company_name')
+    def get_employer(self, obj):
+        return obj.job.employer.company_name
+
+    @admin.display(description='Status')
+    def status_badge(self, obj):
+        colors = {
+            'pending': ('#dc2626', '#fef2f2'),
+            'reviewed': ('#059669', '#ecfdf5'),
+            'dismissed': ('#6b7280', '#f3f4f6'),
+        }
+        text_color, bg_color = colors.get(obj.status, ('#6b7280', '#f3f4f6'))
+        return format_html(
+            '<span style="background:{}; color:{}; padding:3px 10px; '
+            'border-radius:12px; font-size:0.72rem; font-weight:600;">{}</span>',
+            bg_color, text_color, obj.get_status_display()
+        )
+
+    actions = ['mark_dismissed', 'mark_reviewed']
+
+    @admin.action(description='✅ Dismiss Selected Reports (False Alarm)')
+    def mark_dismissed(self, request, queryset):
+        # We need to resolve the underlying jobs, so we iterate
+        jobs_to_resolve = set()
+        for report in queryset:
+            report.status = JobReport.Status.DISMISSED
+            report.save(update_fields=['status', 'updated_at'])
+            jobs_to_resolve.add(report.job)
+        
+        # Check if we should unflag the jobs
+        for job in jobs_to_resolve:
+            resolve_job_report(job)
+            
+        self.message_user(request, f'{queryset.count()} report(s) dismissed.')
+
+    @admin.action(description='⚠️ Mark as Reviewed (Action Taken)')
+    def mark_reviewed(self, request, queryset):
+        jobs_to_resolve = set()
+        for report in queryset:
+            report.status = JobReport.Status.REVIEWED
+            report.save(update_fields=['status', 'updated_at'])
+            jobs_to_resolve.add(report.job)
+
+        for job in jobs_to_resolve:
+            resolve_job_report(job)
+
+        self.message_user(request, f'{queryset.count()} report(s) marked as reviewed.')

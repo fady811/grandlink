@@ -34,7 +34,10 @@ SECRET_KEY = env('SECRET_KEY', default='django-insecure-!@#$%^&*()')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = env.bool('DEBUG', default=True)
 
-ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['localhost', '127.0.0.1'])
+ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['localhost', '127.0.0.1', '127.0.0.1:8080'])
+# Explicitly add '*' or custom ports if running on non-standard ports locally during dev
+if DEBUG:
+    ALLOWED_HOSTS.extend(['*', '127.0.0.1:8080', 'localhost:8080'])
 
 # Application definition
 INSTALLED_APPS = [
@@ -59,7 +62,20 @@ INSTALLED_APPS = [
     'jobs',
     'interviews',
     'ats_engine',
+    'analytics',
+    'configuration',
+    'notifications',
+    'support',
+    'billing',
 ]
+
+# ── CACHING ──────────────────────────────────────────────────
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'unique-snowflake',
+    }
+}
 
 STATICFILES_DIRS = [
     BASE_DIR / "static",
@@ -110,12 +126,13 @@ JAZZMIN_SETTINGS = {
         {"name": "Home", "url": "admin:index", "permissions": ["auth.view_user"]},
         {"model": "authentication.User"},
         {"name": "Jobs", "url": "admin:jobs_job_changelist"},
+        {"name": "Analytics", "url": "admin_analytics", "icon": "fas fa-chart-line"},
     ],
     # Side Menu
     "show_sidebar": True,
     "navigation_expanded": True,
-    "hide_apps": [],
-    "hide_models": [],
+    "hide_apps": ["notifications"],
+    "hide_models": ["notifications.Notification"],
     "order_with_respect_to": ["authentication", "profiles", "jobs", "interviews", "ats_engine"],
     "icons": {
         "auth": "fas fa-users-cog",
@@ -260,6 +277,10 @@ REDIS_URL = env('REDIS_URL', default='redis://localhost:6379/0')
 CELERY_BROKER_URL = REDIS_URL
 CELERY_RESULT_BACKEND = REDIS_URL
 CELERY_TIMEZONE = 'UTC'
+
+# Fast Dev Fix: Run tasks synchronously to avoid Redis connection errors
+CELERY_TASK_ALWAYS_EAGER = True
+CELERY_TASK_EAGER_PROPAGATES = True
 
 from celery.schedules import crontab
 CELERY_BEAT_SCHEDULE = {

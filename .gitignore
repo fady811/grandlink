@@ -1,26 +1,9 @@
-# Django
-*.log
-local_settings.py
-db.sqlite3
-db.sqlite3-journal
-media/
-static/
-staticfiles/
-
-# Environment variables
-.env
-auth_key.json
-
-# Documentation (from user request)
-doc/
-
-# Python
+# ── Python ───────────────────────────────────────────────────
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
-env/
 build/
 develop-eggs/
 dist/
@@ -33,21 +16,60 @@ parts/
 sdist/
 var/
 wheels/
+share/python-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+MANIFEST
 
-# Virtual environments
+# ── Virtual Environments ─────────────────────────────────────
 .venv/
 venv/
 ENV/
+env/
+myenv/
+pip-log.txt
+pip-delete-this-directory.txt
 
-# IDEs
+# ── Django ───────────────────────────────────────────────────
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+media/
+staticfiles/
+# static/  <- Keep static/ if it contains original assets, ignore if it's only for collectstatic
+# Since we have a static/ directory in the root, we might want to keep it.
+# Usually, we ignore the 'static_root' but keep 'static' sources.
+
+# ── Environment Variables & Secrets ──────────────────────────
+.env
+.env.[a-zA-Z]*
+auth_key.json
+*.pem
+*.key
+
+# ── Celery & Redis ───────────────────────────────────────────
+celerybeat-schedule
+celerybeat.pid
+
+# ── IDEs & Editors ───────────────────────────────────────────
 .vscode/
 .idea/
 *.swp
 *.swo
+.project
+.pydevproject
+.settings/
 
-# OS
+# ── OS ───────────────────────────────────────────────────────
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
+
+# ── Documentation ────────────────────────────────────────────
+# doc/  <- Keeping new_doc/ as it contains the documentation we just built

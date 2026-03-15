@@ -1,7 +1,17 @@
 from rest_framework import serializers
 from django.utils import timezone
 
-from .models import Skill, Job, Application, SavedJob
+from .models import Skill, Job, Application, SavedJob, JobReport, JobCategory
+
+
+# ═══════════════════════════════════════════════════════════════
+#  CATEGORY SERIALIZERS
+# ═══════════════════════════════════════════════════════════════
+
+class JobCategorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = JobCategory
+        fields = ('id', 'name', 'slug', 'description')
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -28,6 +38,7 @@ class JobListSerializer(serializers.ModelSerializer):
     applications_count = serializers.IntegerField(read_only=True)
     is_expired = serializers.BooleanField(read_only=True)
     is_saved = serializers.SerializerMethodField()
+    category = JobCategorySerializer(read_only=True)
 
     class Meta:
         model = Job
@@ -35,7 +46,7 @@ class JobListSerializer(serializers.ModelSerializer):
             'id', 'title', 'company_name', 'company_logo',
             'location', 'is_remote', 'work_type', 'experience_level',
             'salary_min', 'salary_max', 'hide_salary',
-            'skills', 'status', 'deadline',
+            'skills', 'category', 'status', 'deadline',
             'applications_count', 'views_count', 'is_expired', 'is_saved',
             'created_at',
         )
@@ -89,6 +100,14 @@ class JobDetailSerializer(serializers.ModelSerializer):
         required=False,
         source='skills',
     )
+    category = JobCategorySerializer(read_only=True)
+    category_id = serializers.PrimaryKeyRelatedField(
+        queryset=JobCategory.objects.all(),
+        write_only=True,
+        required=False,
+        source='category',
+        allow_null=True
+    )
 
     applications_count = serializers.IntegerField(read_only=True)
     is_expired = serializers.BooleanField(read_only=True)
@@ -102,6 +121,7 @@ class JobDetailSerializer(serializers.ModelSerializer):
             'title', 'description', 'requirements', 'responsibilities',
             # Classification
             'work_type', 'experience_level', 'skills', 'skill_ids',
+            'category', 'category_id',
             # Location
             'location', 'is_remote',
             # Compensation
@@ -111,12 +131,17 @@ class JobDetailSerializer(serializers.ModelSerializer):
             # Company info (read-only from employer profile)
             'company_name', 'company_industry', 'company_size',
             'company_website', 'is_verified_employer',
+            # Review info (read-only)
+            'rejection_reason', 'reviewed_at', 'submitted_at',
             # Analytics
             'applications_count', 'views_count', 'is_expired', 'is_saved',
             # Dates
             'created_at', 'updated_at',
         )
-        read_only_fields = ('id', 'views_count', 'created_at', 'updated_at')
+        read_only_fields = (
+            'id', 'views_count', 'created_at', 'updated_at',
+            'rejection_reason', 'reviewed_at', 'submitted_at',
+        )
 
     # ── Validations ──────────────────────────────────────────────
 
@@ -148,6 +173,43 @@ class JobDetailSerializer(serializers.ModelSerializer):
             if salary_min > salary_max:
                 raise serializers.ValidationError({
                     'salary_min': 'Minimum salary cannot exceed maximum salary.',
+                })
+
+        # ── Status transition rules (employer API only) ──────────
+        new_status = attrs.get('status')
+        if new_status and self.instance:
+            current_status = self.instance.status
+
+            # Employers cannot set status to 'active' directly — requires admin approval
+            if new_status == Job.Status.ACTIVE and current_status != Job.Status.PAUSED:
+                raise serializers.ValidationError({
+                    'status': 'Jobs require admin approval to become active. '
+                              'Submit for review instead.',
+                })
+
+            # Employers cannot set status to 'active' from paused if never approved
+            if (
+                new_status == Job.Status.ACTIVE
+                and current_status == Job.Status.PAUSED
+                and self.instance.reviewed_by is None
+            ):
+                raise serializers.ValidationError({
+                    'status': 'This job has not been approved yet. '
+                              'Submit for review instead.',
+                })
+
+            # Employers cannot set pending_review via this endpoint
+            if new_status == Job.Status.PENDING_REVIEW:
+                raise serializers.ValidationError({
+                    'status': 'Use the submit-for-review endpoint to request approval.',
+                })
+
+        # On creation, force status to draft
+        if not self.instance:
+            status_val = attrs.get('status', Job.Status.DRAFT)
+            if status_val != Job.Status.DRAFT:
+                raise serializers.ValidationError({
+                    'status': 'New jobs must start as draft.',
                 })
 
         return attrs
@@ -296,3 +358,15 @@ class SavedJobSerializer(serializers.ModelSerializer):
         model = SavedJob
         fields = ('id', 'job', 'saved_at')
         read_only_fields = ('id', 'saved_at')
+
+
+# ═══════════════════════════════════════════════════════════════
+#  REPORT SERIALIZERS
+# ═══════════════════════════════════════════════════════════════
+
+class JobReportSerializer(serializers.ModelSerializer):
+    """Payload for reporting a job."""
+    class Meta:
+        model = JobReport
+        fields = ('id', 'reason', 'details', 'status', 'created_at')
+        read_only_fields = ('id', 'status', 'created_at')

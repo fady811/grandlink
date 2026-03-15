@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GrandLink API Documentation</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-hover: #4f46e5;
+            --bg: #0f172a;
+            --card-bg: #1e293b;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: #334155;
+            --badge-get: #3b82f6;
+            --badge-post: #10b981;
+            --badge-put: #f59e0b;
+            --badge-patch: #8b5cf6;
+            --badge-delete: #ef4444;
+            --code-bg: #000000;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg);
+            color: var(--text-main);
+            line-height: 1.6;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        header {
+            margin-bottom: 3rem;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            background: linear-gradient(135deg, #818cf8 0%, #c084fc 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        p.subtitle {
+            color: var(--text-muted);
+            font-size: 1.1rem;
+        }
+
+        .section-title {
+            font-size: 1.5rem;
+            margin: 2rem 0 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid var(--border);
+            color: #e2e8f0;
+        }
+
+        .api-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .api-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.2);
+        }
+
+        .api-header {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .method-badge {
+            font-family: 'Fira Code', monospace;
+            font-size: 0.8rem;
+            font-weight: 700;
+            padding: 0.25rem 0.75rem;
+            border-radius: 6px;
+            text-transform: uppercase;
+            min-width: 80px;
+            text-align: center;
+        }
+
+        .method-get { background: rgba(59, 130, 246, 0.2); color: var(--badge-get); border: 1px solid var(--badge-get); }
+        .method-post { background: rgba(16, 185, 129, 0.2); color: var(--badge-post); border: 1px solid var(--badge-post); }
+        .method-put { background: rgba(245, 158, 11, 0.2); color: var(--badge-put); border: 1px solid var(--badge-put); }
+        .method-patch { background: rgba(139, 92, 246, 0.2); color: var(--badge-patch); border: 1px solid var(--badge-patch); }
+        .method-delete { background: rgba(239, 68, 68, 0.2); color: var(--badge-delete); border: 1px solid var(--badge-delete); }
+
+        .path {
+            font-family: 'Fira Code', monospace;
+            font-size: 1.1rem;
+            color: #f1f5f9;
+            word-break: break-all;
+        }
+
+        .description {
+            margin-bottom: 1.5rem;
+            color: var(--text-muted);
+            font-size: 0.95rem;
+        }
+
+        .auth-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            font-size: 0.75rem;
+            padding: 0.1rem 0.6rem;
+            background: rgba(245, 158, 11, 0.1);
+            color: #fbbf24;
+            border: 1px solid rgba(245, 158, 11, 0.3);
+            border-radius: 9999px;
+            margin-left: auto;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+        }
+
+        @media (max-width: 768px) {
+            .grid { grid-template-columns: 1fr; }
+        }
+
+        .box-label {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            margin-bottom: 0.5rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .code-box {
+            position: relative;
+            background: var(--code-bg);
+            border-radius: 8px;
+            padding: 1rem;
+            overflow: auto;
+            border: 1px solid var(--border);
+        }
+
+        pre {
+            font-family: 'Fira Code', monospace;
+            font-size: 0.85rem;
+            color: #e2e8f0;
+        }
+
+        .copy-btn {
+            background: #334155;
+            border: none;
+            color: #cbd5e1;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.7rem;
+            transition: background 0.2s;
+        }
+
+        .copy-btn:hover {
+            background: #475569;
+        }
+
+        .field-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+            font-size: 0.85rem;
+        }
+
+        .field-table th, .field-table td {
+            text-align: left;
+            padding: 0.5rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .field-table th { color: var(--text-muted); }
+        .field-name { font-weight: 600; color: #818cf8; }
+        .field-type { color: #10b981; }
+
+        footer {
+            margin-top: 5rem;
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>GrandLink API</h1>
+            <p class="subtitle">Complete backend API reference for developers</p>
+        </header>
+
+        <section id="auth">
+            <h2 class="section-title">Authentication</h2>
+            
+            <!-- Register -->
+            <div class="api-card">
+                <div class="api-header">
+                    <span class="method-badge method-post">POST</span>
+                    <span class="path">/api/auth/register/</span>
+                </div>
+                <p class="description">Register a new user account. Creates an inactive user and sends an OTP to their email for verification.</p>
+                
+                <div class="grid">
+                    <div>
+                        <div class="box-label">Request Body <button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+                        <div class="code-box">
+<pre>{
+  "email": "user@example.com",
+  "password": "Password123!",
+  "password2": "Password123!",
+  "role": "student" 
+}</pre>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="box-label">Success Response (201) <button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+                        <div class="code-box">
+<pre>{
+  "message": "User created. Please verify email.",
+  "email": "user@example.com"
+}</pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Verify OTP -->
+            <div class="api-card">
+                <div class="api-header">
+                    <span class="method-badge method-post">POST</span>
+                    <span class="path">/api/auth/verify-otp/</span>
+                </div>
+                <p class="description">Verify user email using the 6-digit code sent during registration or resend.</p>
+                
+                <div class="grid">
+                    <div>
+                        <div class="box-label">Request Body <button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+                        <div class="code-box">
+<pre>{
+  "email": "user@example.com",
+  "code": "123456"
+}</pre>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="box-label">Success Response (200) <button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+                        <div class="code-box">
+<pre>{
+  "message": "Email verified successfully.",
+  "access": "jwt_access_token",
+  "refresh": "jwt_refresh_token"
+}</pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Login -->
+            <div class="api-card">
+                <div class="api-header">
+                    <span class="method-badge method-post">POST</span>
+                    <span class="path">/api/auth/login/</span>
+                </div>
+                <p class="description">Authenticate user and obtain JWT tokens.</p>
+                
+                <div class="grid">
+                    <div>
+                        <div class="box-label">Request Body <button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+                        <div class="code-box">
+<pre>{
+  "email": "user@example.com",
+  "password": "Password123!"
+}</pre>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="box-label">Success Response (200) <button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+                        <div class="code-box">
+<pre>{
+  "access": "jwt_token_here",
+  "refresh": "jwt_refresh_here",
+  "user": {
+    "id": "uuid",
+    "email": "user@example.com",
+    "role": "student"
+  }
+}</pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Google Auth -->
+            <div class="api-card">
+                <div class="api-header">
+                    <span class="method-badge method-post">POST</span>
+                    <span class="path">/api/auth/google/</span>
+                </div>
+                <p class="description">Authenticate via Google OAuth2 token. Automatically creates/activates user.</p>
+                
+                <div class="grid">
+                    <div>
+                        <div class="box-label">Request Body <button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+                        <div class="code-box">
+<pre>{
+  "token": "google_id_token",
+  "role": "employer"
+}</pre>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="box-label">Success Response (200) <button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+                        <div class="code-box">
+<pre>{
+  "access": "jwt_token",
+  "refresh": "jwt_refresh",
+  "user": { ... }
+}</pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="profiles">
+            <h2 class="section-title">Profiles</h2>
+
+            <!-- Student Profile -->
+            <div class="api-card">
+                <div class="api-header">
+                    <span class="method-badge method-get">GET</span>
+                    <span class="method-badge method-put">PUT</span>
+                    <span class="path">/api/profiles/student/[UUID]/</span>
+                    <span class="auth-tag">JWT Required</span>
+                </div>
+                <p class="description">Retrieve or update student profile details. Path parameter is optional for the owner.</p>
+                
+                <div class="grid">
+                    <div>
+                        <div class="box-label">Example PUT Body <button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+                        <div class="code-box">
+<pre>{
+  "university": "Cairo University",
+  "major": "Computer Science",
+  "graduation_year": 2025,
+  "gpa": "3.85",
+  "skills": ["Python", "Django", "React"],
+  "hide_gpa": false
+}</pre>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="box-label">Response Example <button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+                        <div class="code-box">
+<pre>{
+  "id": "uuid",
+  "university": "Cairo University",
+  "major": "Computer Science",
+  "graduation_year": 2025,
+  "gpa": "3.85",
+  "bio": "Passionate developer...",
+  "skills": ["Python", "Django"],
+  "is_profile_public": true
+}</pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Employer Profile -->
+            <div class="api-card">
+                <div class="api-header">
+                    <span class="method-badge method-get">GET</span>
+                    <span class="method-badge method-put">PUT</span>
+                    <span class="path">/api/profiles/employer/[UUID]/</span>
+                    <span class="auth-tag">JWT Required</span>
+                </div>
+                <p class="description">Manage employer profile. Requires authenticated user with employer role or admin access.</p>
+                
+                <div class="grid">
+                    <div>
+                        <div class="box-label">Example Body <button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+                        <div class="code-box">
+<pre>{
+  "company_name": "TechCorp",
+  "industry": "Software",
+  "company_size": "50-100",
+  "website": "https://techcorp.com",
+  "phone": "+20123456789"
+}</pre>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="box-label">Response Body <button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+                        <div class="code-box">
+<pre>{
+  "id": "uuid",
+  "company_name": "TechCorp",
+  "industry": "Software",
+  "is_verified": true,
+  "is_profile_public": true
+}</pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Privacy Settings -->
+            <div class="api-card">
+                <div class="api-header">
+                    <span class="method-badge method-patch">PATCH</span>
+                    <span class="path">/api/profiles/privacy/</span>
+                    <span class="auth-tag">JWT Required</span>
+                </div>
+                <p class="description">Endpoint to quickly toggle privacy flags for the current user's profile.</p>
+                
+                <div class="grid">
+                    <div>
+                        <div class="box-label">Request Body <button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+                        <div class="code-box">
+<pre>{
+  "hide_gpa": true,
+  "hide_phone": true,
+  "is_profile_public": false
+}</pre>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="box-label">Response Body <button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+                        <div class="code-box">
+<pre>{
+  "message": "Privacy settings updated.",
+  "status": "success"
+}</pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <footer>
+            <p>&copy; 2026 GrandLink Backend. Built with Django REST Framework.</p>
+        </footer>
+    </div>
+
+    <script>
+        function copyCode(btn) {
+            const code = btn.parentElement.nextElementSibling.innerText;
+            navigator.clipboard.writeText(code).then(() => {
+                const originalText = btn.innerText;
+                btn.innerText = 'Copied!';
+                btn.style.background = '#10b981';
+                setTimeout(() => {
+                    btn.innerText = originalText;
+                    btn.style.background = '#334155';
+                }, 2000);
+            });
+        }
+    </script>
+</body>
+</html>

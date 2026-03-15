@@ -1,0 +1,1052 @@
+# 🏗️ GrandLink — تقرير المراجعة المعمارية الشامل
+
+> **المراجع:** Senior Backend Architect  
+> **التاريخ:** 28 فبراير 2026  
+> **المشروع:** GrandLink (GradLink)  
+> **التقنيات:** Django 5.x · DRF · PostgreSQL · SimpleJWT · Redis/Celery
+
+---
+
+## 📑 جدول المحتويات
+
+1. [الملخص التنفيذي](#-الملخص-التنفيذي)
+2. [تقييم معمارية المشروع الحالية](#-تقييم-معمارية-المشروع-الحالية)
+3. [مراجعة موديول Authentication](#-مراجعة-موديول-authentication)
+4. [مراجعة موديول Profiles](#-مراجعة-موديول-profiles)
+5. [تصميم موديول Jobs المقترح](#-تصميم-موديول-jobs-المقترح)
+6. [جاهزية Integration مع React](#-جاهزية-integration-مع-react)
+7. [خطة التنفيذ المقترحة](#-خطة-التنفيذ-المقترحة)
+
+---
+
+## 🎯 الملخص التنفيذي
+
+| البُعد | التقييم | ملاحظات |
+|--------|---------|---------|
+| **هيكلة المشروع** | ✅ جيد | فصل واضح بين الـ apps |
+| **Auth Security** | ⚠️ يحتاج تحسين | نقاط ضعف في OTP و Rate Limiting |
+| **RESTful Design** | ⚠️ يحتاج تحسين | غياب Pagination و Throttling و Versioning |
+| **Profiles Module** | ✅ جيد | Privacy logic محكمة، لكن تحتاج select_related |
+| **React Readiness** | ⚠️ يحتاج تحسين | CORS موجود لكن ينقص Response Envelope و Pagination |
+| **Database Design** | ✅ جيد | UUID كـ PK، Indexes موجودة |
+| **Production Readiness** | 🔴 ضعيف | لا يوجد Logging و Throttling و Error Handling موحد |
+
+> [!IMPORTANT]
+> المشروع في مرحلة بداية ممتازة مع أساس قوي. الملاحظات المذكورة هنا هي تحسينات **استباقية** لتجنب الـ Technical Debt قبل التوسع.
+
+---
+
+## 🏛️ تقييم معمارية المشروع الحالية
+
+### هيكلة المجلدات الحالية
+
+```
+grandlink/
+├── core/              ← Project config (settings, urls, wsgi)
+├── authentication/    ← Custom User, OTP, JWT Auth
+├── profiles/          ← Student & Employer Profiles
+├── jobs/              ← فارغ (المرحلة القادمة)
+├── ats_engine/        ← فارغ (Applicant Tracking System)
+├── static/css/        ← Custom admin CSS
+├── templates/admin/   ← Admin templates
+├── requirements.txt
+└── manage.py
+```
+
+### ✅ نقاط القوة
+
+| النقطة | التفاصيل |
+|--------|----------|
+| **فصل الـ Apps** | كل module في app منفصلة — مبدأ Separation of Concerns محقق |
+| **Custom User Model** | استخدام `AbstractUser` مع email كـ `USERNAME_FIELD` — قرار معماري ممتاز |
+| **UUID Primary Keys** | حماية ضد IDOR attacks و أكثر أماناً من integer IDs |
+| **SimpleJWT** | مُعد بشكل صحيح مع Token Rotation و Blacklisting |
+| **Environment Variables** | استخدام `django-environ` لفصل الـ secrets |
+| **Signals لإنشاء Profiles** | تلقائي عند تفعيل المستخدم — DRY pattern |
+| **CORS Configured** | `corsheaders` مضبوط لـ React development port |
+
+### ⚠️ نقاط التحسين
+
+| النقطة | الأولوية | التفاصيل |
+|--------|----------|----------|
+| **لا يوجد API Versioning** | 🔴 عالية | عند ربط React، أي تغيير في الـ API سيكسر الـ Frontend |
+| **لا يوجد Throttling** | 🔴 عالية | عدم وجود Rate Limiting يعرض الـ API لـ DDoS |
+| **لا يوجد Pagination** | 🔴 عالية | مع نمو البيانات ستحدث مشاكل في الأداء |
+| **لا يوجد Standardized Response Format** | 🟡 متوسطة | كل view يرجع structure مختلف |
+| **لا يوجد Logging** | 🟡 متوسطة | صعوبة في الـ debugging في الـ production |
+| **لا يوجد Tests** | 🔴 عالية | ملفات [tests.py](file:///c:/Users/fadyb/OneDrive/Desktop/projects/grandlink/jobs/tests.py) فارغة |
+
+---
+
+## 🔐 مراجعة موديول Authentication
+
+### هيكلة الملفات
+
+```
+authentication/
+├── models.py          User + OTPVerification
+├── serializers.py     Register, Login, OTP, UserDetail
+├── views.py           Register, Login, OTP, Google Auth
+├── utils.py           OTP generation & verification
+├── urls.py            5 endpoints
+└── admin.py           Basic admin registration
+```
+
+### الـ Endpoints الحالية
+
+| Method | Endpoint | الوصف | Permission |
+|--------|----------|-------|------------|
+| `POST` | `/api/auth/register/` | تسجيل مستخدم جديد | AllowAny |
+| `POST` | `/api/auth/verify-otp/` | تفعيل الحساب بالـ OTP | AllowAny |
+| `POST` | `/api/auth/resend-otp/` | إعادة إرسال OTP | AllowAny |
+| `POST` | `/api/auth/login/` | تسجيل الدخول | AllowAny |
+| `POST` | `/api/auth/google/` | تسجيل دخول Google | AllowAny |
+
+### 🐛 مشاكل حرجة يجب إصلاحها
+
+#### 1. ثغرة في OTP: استخدام `random` بدل `secrets`
+
+```diff
+# authentication/utils.py
+-import random
++import secrets
+
+ def generate_otp():
+     """Generate a 6-digit OTP"""
+-    return ''.join(random.choices(string.digits, k=6))
++    return ''.join(secrets.choice(string.digits) for _ in range(6))
+```
+
+> [!CAUTION]
+> `random.choices()` ليس cryptographically secure. استخدام `secrets` ضروري لأي عملية أمنية.
+
+#### 2. عدم وجود Rate Limiting على الـ Auth Endpoints
+
+حالياً يمكن لأي شخص إرسال آلاف الطلبات على `/register/` أو `/login/`. الحل:
+
+```python
+# core/settings.py — أضفه لإعدادات REST_FRAMEWORK
+REST_FRAMEWORK = {
+    # ... existing settings ...
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle',
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': '30/minute',
+        'user': '100/minute',
+        'auth': '5/minute',    # Custom throttle for auth endpoints
+    }
+}
+```
+
+```python
+# authentication/throttles.py — ملف جديد
+from rest_framework.throttling import AnonRateThrottle
+
+class AuthRateThrottle(AnonRateThrottle):
+    scope = 'auth'
+```
+
+#### 3. `OTP_EXPIRE_MINUTES = 50` و `OTP_MAX_ATTEMPTS = 50` — قيم مرتفعة جداً
+
+```diff
+# core/settings.py
+-OTP_EXPIRE_MINUTES = 50
+-OTP_MAX_ATTEMPTS = 50
++OTP_EXPIRE_MINUTES = 10    # 10 دقائق كافية
++OTP_MAX_ATTEMPTS = 5       # 5 محاولات كحد أقصى
+```
+
+> [!WARNING]
+> OTP صالح لمدة 50 دقيقة مع 50 محاولة يعني أن المهاجم لديه 50 محاولة × 50 دقيقة لتخمين رقم من 6 خانات. يجب تقليل هذه القيم بشدة.
+
+#### 4. مشاكل في [verify_otp](file:///c:/Users/fadyb/OneDrive/Desktop/projects/grandlink/authentication/utils.py#49-74) function
+
+```python
+# المشكلة الحالية: بعد التحقق الناجح يتم حذف الـ OTP
+otp.delete()
+
+# المشكلة: إذا حصل خطأ بعد delete وقبل user.save()
+# النتيجة: OTP محذوف والمستخدم لم يتفعل
+
+# ✅ الحل: استخدام database transaction
+from django.db import transaction
+
+def verify_otp(email, code):
+    try:
+        user = User.objects.get(email=email)
+        otp = OTPVerification.objects.filter(
+            user=user, is_used=False
+        ).latest('created_at')
+    except (User.DoesNotExist, OTPVerification.DoesNotExist):
+        return False, "Invalid email or code."
+
+    if otp.attempt_count >= settings.OTP_MAX_ATTEMPTS:
+        return False, "Maximum attempts exceeded."
+
+    otp.attempt_count += 1
+    otp.save()
+
+    if not otp.is_valid():
+        return False, "Code expired."
+
+    if otp.code != code:
+        remaining = settings.OTP_MAX_ATTEMPTS - otp.attempt_count
+        return False, f"Invalid code. {remaining} attempts remaining."
+
+    # ✅ Atomic transaction
+    with transaction.atomic():
+        otp.is_used = True   # Mark as used instead of delete
+        otp.save()
+        user.is_active = True
+        user.save()
+
+    return True, "Email verified successfully."
+```
+
+#### 5. عدم وجود Logout Endpoint
+
+```python
+# authentication/views.py — أضف هذا
+class LogoutView(generics.GenericAPIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        try:
+            refresh_token = request.data.get("refresh")
+            token = RefreshToken(refresh_token)
+            token.blacklist()
+            return Response(
+                {"message": "Logged out successfully."},
+                status=status.HTTP_200_OK
+            )
+        except Exception:
+            return Response(
+                {"error": "Invalid token."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+```
+
+#### 6. عدم وجود Password Reset
+
+ينقصك endpoints لـ:
+- `POST /api/auth/password-reset/` — إرسال OTP لإعادة التعيين
+- `POST /api/auth/password-reset/confirm/` — تأكيد الـ OTP + كلمة المرور الجديدة
+
+### 🔧 تحسينات مقترحة لـ SimpleJWT
+
+```python
+# core/settings.py
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=30),      # ← خفض من 60 لـ 30
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),          # ← زيادة لراحة المستخدم
+    'ROTATE_REFRESH_TOKENS': True,
+    'BLACKLIST_AFTER_ROTATION': True,
+    'UPDATE_LAST_LOGIN': True,                            # ← تتبع آخر تسجيل دخول
+    'ALGORITHM': 'HS256',
+    'AUTH_HEADER_TYPES': ('Bearer',),
+    'TOKEN_OBTAIN_SERIALIZER': 'rest_framework_simplejwt.serializers.TokenObtainPairSerializer',
+    # ← Custom claims (اختياري)
+    'TOKEN_OBTAIN_SERIALIZER': 'authentication.serializers.CustomTokenObtainPairSerializer',
+}
+```
+
+```python
+# authentication/serializers.py — Custom Token with user info
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+
+class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
+    @classmethod
+    def get_token(cls, user):
+        token = super().get_token(user)
+        # إضافة custom claims
+        token['role'] = user.role
+        token['email'] = user.email
+        return token
+```
+
+> [!TIP]
+> إضافة الـ `role` في الـ JWT token يسمح لـ React بتحديد صلاحيات المستخدم بدون طلب إضافي للـ API.
+
+---
+
+## 👤 مراجعة موديول Profiles
+
+### هيكلة الملفات
+
+```
+profiles/
+├── models.py          StudentProfile + EmployerProfile
+├── serializers.py     Privacy-aware serializers
+├── views.py           CRUD + Privacy settings
+├── signals.py         Auto-create profile on user activation
+├── urls.py            5 endpoints
+└── admin.py           Basic admin
+```
+
+### الـ Endpoints الحالية
+
+| Method | Endpoint | الوصف |
+|--------|----------|-------|
+| `GET/PUT/PATCH` | `/api/profiles/student/` | My student profile |
+| `GET/PUT/PATCH` | `/api/profiles/student/<uuid>/` | Student profile by user ID |
+| `GET/PUT/PATCH` | `/api/profiles/employer/` | My employer profile |
+| `GET/PUT/PATCH` | `/api/profiles/employer/<uuid>/` | Employer profile by user ID |
+| `PATCH` | `/api/profiles/privacy/` | Update privacy flags |
+
+### ✅ نقاط القوة
+
+| النقطة | التفاصيل |
+|--------|----------|
+| **Privacy Logic في Serializer** | [to_representation](file:///c:/Users/fadyb/OneDrive/Desktop/projects/grandlink/profiles/serializers.py#45-64) تطبق قواعد الخصوصية بناءً على هوية الطالب — ممتاز |
+| **Signal لإنشاء Profile تلقائياً** | `post_save` signal مع `get_or_create` — يمنع الـ duplicates |
+| **IsOwnerOrAdmin Permission** | Custom permission class — Clean separation |
+| **MultiPartParser** | دعم رفع الملفات (CV) جاهز |
+
+### 🐛 مشاكل يجب إصلاحها
+
+#### 1. Signal يتفعل عند كل [save()](file:///c:/Users/fadyb/OneDrive/Desktop/projects/grandlink/authentication/models.py#86-90) وليس فقط عند الـ activation
+
+```python
+# profiles/signals.py — المشكلة
+@receiver(post_save, sender=settings.AUTH_USER_MODEL)
+def create_profile(sender, instance, created, **kwargs):
+    if instance.is_active:  # ⚠️ يتفعل كل مرة يتم فيها save للمستخدم
+        if instance.role == 'student':
+            StudentProfile.objects.get_or_create(user=instance)
+```
+
+> [!NOTE]
+> هذه ليست مشكلة كبيرة بسبب `get_or_create`، لكنها تنفذ query غير ضرورية في كل `user.save()`.
+
+```python
+# ✅ الحل: تتبع تغيير حالة الـ is_active
+@receiver(post_save, sender=settings.AUTH_USER_MODEL)
+def create_profile(sender, instance, created, **kwargs):
+    if not instance.is_active:
+        return
+    if instance.role == 'student':
+        StudentProfile.objects.get_or_create(user=instance)
+    elif instance.role == 'employer':
+        EmployerProfile.objects.get_or_create(user=instance)
+```
+
+#### 2. عدم وجود `select_related` — مشكلة N+1 Queries
+
+```python
+# profiles/views.py
+class StudentProfileDetailView(generics.RetrieveUpdateAPIView):
+    # ...
+    queryset = StudentProfile.objects.all()  # ⚠️ لا يتضمن user data
+
+    # ✅ الحل:
+    queryset = StudentProfile.objects.select_related('user')
+```
+
+#### 3. عدم وجود Validation على `skills` JSONField
+
+```python
+# profiles/serializers.py — أضف validation
+class StudentProfileSerializer(serializers.ModelSerializer):
+    # ...
+    def validate_skills(self, value):
+        if not isinstance(value, list):
+            raise serializers.ValidationError("Skills must be a list.")
+        if len(value) > 50:
+            raise serializers.ValidationError("Maximum 50 skills allowed.")
+        for skill in value:
+            if not isinstance(skill, str) or len(skill) > 100:
+                raise serializers.ValidationError(
+                    "Each skill must be a string of max 100 characters."
+                )
+        return value
+```
+
+#### 4. عدم وجود CV File Validation
+
+```python
+# profiles/serializers.py
+def validate_cv_file(self, value):
+    if value:
+        # التحقق من نوع الملف
+        allowed_types = ['application/pdf', 'application/msword',
+                         'application/vnd.openxmlformats-officedocument.wordprocessingml.document']
+        if value.content_type not in allowed_types:
+            raise serializers.ValidationError("Only PDF and Word documents are allowed.")
+        # التحقق من حجم الملف (5MB max)
+        if value.size > 5 * 1024 * 1024:
+            raise serializers.ValidationError("File size must be under 5MB.")
+    return value
+```
+
+#### 5. PrivacySettingsView يسمح بتعديل أي حقل وليس فقط الـ Privacy flags
+
+```python
+# ✅ الحل: تحديد الحقول المسموح بتعديلها
+class PrivacySettingsView(generics.GenericAPIView):
+    permission_classes = [permissions.IsAuthenticated]
+    STUDENT_PRIVACY_FIELDS = {'hide_gpa', 'hide_phone', 'is_profile_public'}
+    EMPLOYER_PRIVACY_FIELDS = {'hide_phone', 'is_profile_public'}
+
+    def patch(self, request):
+        user = request.user
+        if user.role == 'student':
+            allowed = self.STUDENT_PRIVACY_FIELDS
+            profile = get_object_or_404(StudentProfile, user=user)
+            filtered_data = {k: v for k, v in request.data.items() if k in allowed}
+            serializer = StudentProfileSerializer(
+                profile, data=filtered_data, partial=True,
+                context={'request': request}
+            )
+        # ... same for employer
+```
+
+### 🔧 تحسينات مقترحة للأداء
+
+```python
+# profiles/models.py — أضف database indexes
+class StudentProfile(models.Model):
+    # ... existing fields ...
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['university']),
+            models.Index(fields=['graduation_year']),
+            models.Index(fields=['is_profile_public']),
+        ]
+
+class EmployerProfile(models.Model):
+    # ... existing fields ...
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['company_name']),
+            models.Index(fields=['industry']),
+            models.Index(fields=['is_verified']),
+            models.Index(fields=['is_profile_public']),
+        ]
+```
+
+---
+
+## 💼 تصميم موديول Jobs المقترح
+
+### ER Diagram
+
+```mermaid
+erDiagram
+    User ||--o| EmployerProfile : "has"
+    User ||--o| StudentProfile : "has"
+    EmployerProfile ||--o{ Job : "posts"
+    Job ||--o{ Application : "receives"
+    StudentProfile ||--o{ Application : "submits"
+    Job }o--o{ Skill : "requires"
+    StudentProfile }o--o{ Skill : "has"
+    Job }o--o| SavedJob : "saved_by"
+    StudentProfile }o--o| SavedJob : "saves"
+
+    User {
+        uuid id PK
+        string email UK
+        string role
+        bool is_active
+    }
+
+    EmployerProfile {
+        uuid id PK
+        uuid user_id FK
+        string company_name
+        string industry
+        bool is_verified
+    }
+
+    StudentProfile {
+        uuid id PK
+        uuid user_id FK
+        string university
+        json skills
+    }
+
+    Job {
+        uuid id PK
+        uuid employer_id FK
+        string title
+        text description
+        string location
+        string work_type
+        string experience_level
+        decimal salary_min
+        decimal salary_max
+        string status
+        datetime deadline
+        datetime created_at
+    }
+
+    Skill {
+        int id PK
+        string name UK
+        string category
+    }
+
+    Application {
+        uuid id PK
+        uuid job_id FK
+        uuid student_id FK
+        string status
+        text cover_letter
+        file resume
+        datetime applied_at
+        datetime updated_at
+    }
+
+    SavedJob {
+        uuid id PK
+        uuid student_id FK
+        uuid job_id FK
+        datetime saved_at
+    }
+```
+
+### Database Schema المقترح
+
+```python
+# jobs/models.py
+
+import uuid
+from django.db import models
+from django.conf import settings
+from django.core.validators import MinValueValidator
+
+
+class Skill(models.Model):
+    """Normalized skills table — shared between Jobs & Students"""
+    name = models.CharField(max_length=100, unique=True, db_index=True)
+    category = models.CharField(
+        max_length=50, blank=True,
+        choices=[
+            ('technical', 'Technical'),
+            ('soft', 'Soft Skill'),
+            ('language', 'Language'),
+            ('tool', 'Tool/Software'),
+        ]
+    )
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        ordering = ['name']
+
+
+class Job(models.Model):
+    """Job posting by an Employer"""
+
+    class WorkType(models.TextChoices):
+        FULL_TIME = 'full_time', 'Full Time'
+        PART_TIME = 'part_time', 'Part Time'
+        INTERNSHIP = 'internship', 'Internship'
+        CONTRACT = 'contract', 'Contract'
+        REMOTE = 'remote', 'Remote'
+
+    class ExperienceLevel(models.TextChoices):
+        ENTRY = 'entry', 'Entry Level'
+        MID = 'mid', 'Mid Level'
+        SENIOR = 'senior', 'Senior Level'
+        FRESH_GRAD = 'fresh_grad', 'Fresh Graduate'
+
+    class Status(models.TextChoices):
+        DRAFT = 'draft', 'Draft'
+        ACTIVE = 'active', 'Active'
+        PAUSED = 'paused', 'Paused'
+        CLOSED = 'closed', 'Closed'
+        EXPIRED = 'expired', 'Expired'
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    employer = models.ForeignKey(
+        'profiles.EmployerProfile',
+        on_delete=models.CASCADE,
+        related_name='jobs'
+    )
+
+    # Job Details
+    title = models.CharField(max_length=255, db_index=True)
+    description = models.TextField()
+    requirements = models.TextField(blank=True)       # ← ما يُطلب من المتقدم
+    responsibilities = models.TextField(blank=True)    # ← مسؤوليات الوظيفة
+
+    # Classification
+    work_type = models.CharField(
+        max_length=20,
+        choices=WorkType.choices,
+        default=WorkType.FULL_TIME
+    )
+    experience_level = models.CharField(
+        max_length=20,
+        choices=ExperienceLevel.choices,
+        default=ExperienceLevel.ENTRY
+    )
+    skills = models.ManyToManyField(Skill, blank=True, related_name='jobs')
+
+    # Location
+    location = models.CharField(max_length=255, blank=True)
+    is_remote = models.BooleanField(default=False)
+
+    # Compensation
+    salary_min = models.DecimalField(
+        max_digits=10, decimal_places=2,
+        null=True, blank=True,
+        validators=[MinValueValidator(0)]
+    )
+    salary_max = models.DecimalField(
+        max_digits=10, decimal_places=2,
+        null=True, blank=True,
+        validators=[MinValueValidator(0)]
+    )
+    hide_salary = models.BooleanField(default=False)
+
+    # Status & Dates
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.DRAFT
+    )
+    deadline = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    # Analytics
+    views_count = models.PositiveIntegerField(default=0)
+
+    def __str__(self):
+        return f"{self.title} — {self.employer.company_name}"
+
+    @property
+    def is_expired(self):
+        from django.utils import timezone
+        if self.deadline and self.deadline < timezone.now():
+            return True
+        return self.status == self.Status.EXPIRED
+
+    @property
+    def applications_count(self):
+        return self.applications.count()
+
+    def clean(self):
+        from django.core.exceptions import ValidationError
+        if self.salary_min and self.salary_max:
+            if self.salary_min > self.salary_max:
+                raise ValidationError(
+                    "Minimum salary cannot exceed maximum salary."
+                )
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['status', 'deadline']),
+            models.Index(fields=['work_type']),
+            models.Index(fields=['experience_level']),
+            models.Index(fields=['employer', 'status']),
+            models.Index(fields=['-created_at']),
+            models.Index(fields=['location']),
+        ]
+
+
+class Application(models.Model):
+    """Student application for a Job"""
+
+    class Status(models.TextChoices):
+        PENDING = 'pending', 'Pending'
+        REVIEWING = 'reviewing', 'Under Review'
+        SHORTLISTED = 'shortlisted', 'Shortlisted'
+        INTERVIEW = 'interview', 'Interview Scheduled'
+        ACCEPTED = 'accepted', 'Accepted'
+        REJECTED = 'rejected', 'Rejected'
+        WITHDRAWN = 'withdrawn', 'Withdrawn'
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    job = models.ForeignKey(
+        Job,
+        on_delete=models.CASCADE,
+        related_name='applications'
+    )
+    student = models.ForeignKey(
+        'profiles.StudentProfile',
+        on_delete=models.CASCADE,
+        related_name='applications'
+    )
+
+    # Application Content
+    cover_letter = models.TextField(blank=True)
+    resume = models.FileField(upload_to='applications/resumes/', null=True, blank=True)
+
+    # Status Tracking
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.PENDING
+    )
+    employer_notes = models.TextField(blank=True)  # ← ملاحظات خاصة بالـ Employer
+
+    # Dates
+    applied_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.student.user.email} → {self.job.title}"
+
+    class Meta:
+        # ✅ منع التقديم المزدوج
+        constraints = [
+            models.UniqueConstraint(
+                fields=['job', 'student'],
+                name='unique_application_per_job'
+            )
+        ]
+        ordering = ['-applied_at']
+        indexes = [
+            models.Index(fields=['job', 'status']),
+            models.Index(fields=['student', 'status']),
+            models.Index(fields=['-applied_at']),
+        ]
+
+
+class SavedJob(models.Model):
+    """Bookmarked/Saved Jobs by Students"""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    student = models.ForeignKey(
+        'profiles.StudentProfile',
+        on_delete=models.CASCADE,
+        related_name='saved_jobs'
+    )
+    job = models.ForeignKey(
+        Job,
+        on_delete=models.CASCADE,
+        related_name='saved_by'
+    )
+    saved_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['student', 'job'],
+                name='unique_saved_job'
+            )
+        ]
+        ordering = ['-saved_at']
+```
+
+### العلاقات بين الـ Models
+
+```mermaid
+graph TD
+    A["User (Auth)"] -->|OneToOne| B["StudentProfile"]
+    A -->|OneToOne| C["EmployerProfile"]
+    C -->|OneToMany| D["Job"]
+    D -->|ManyToMany| E["Skill"]
+    D -->|OneToMany| F["Application"]
+    B -->|OneToMany| F
+    B -->|OneToMany| G["SavedJob"]
+    D -->|OneToMany| G
+
+    style A fill:#4A90D9,color:#fff
+    style B fill:#7ED321,color:#fff
+    style C fill:#F5A623,color:#fff
+    style D fill:#D0021B,color:#fff
+    style E fill:#9013FE,color:#fff
+    style F fill:#50E3C2,color:#000
+    style G fill:#B8E986,color:#000
+```
+
+| العلاقة | النوع | الوصف |
+|---------|-------|-------|
+| [User](file:///c:/Users/fadyb/OneDrive/Desktop/projects/grandlink/authentication/models.py#38-74) → [StudentProfile](file:///c:/Users/fadyb/OneDrive/Desktop/projects/grandlink/profiles/models.py#5-27) | OneToOne | كل student له profile واحد |
+| [User](file:///c:/Users/fadyb/OneDrive/Desktop/projects/grandlink/authentication/models.py#38-74) → [EmployerProfile](file:///c:/Users/fadyb/OneDrive/Desktop/projects/grandlink/profiles/models.py#29-50) | OneToOne | كل employer له profile واحد |
+| [EmployerProfile](file:///c:/Users/fadyb/OneDrive/Desktop/projects/grandlink/profiles/models.py#29-50) → `Job` | OneToMany | Employer ينشر عدة وظائف |
+| `Job` → `Skill` | ManyToMany | الوظيفة تحتاج عدة مهارات، والمهارة مطلوبة في عدة وظائف |
+| `Job` → `Application` | OneToMany | الوظيفة تستقبل عدة طلبات |
+| [StudentProfile](file:///c:/Users/fadyb/OneDrive/Desktop/projects/grandlink/profiles/models.py#5-27) → `Application` | OneToMany | الطالب يقدم على عدة وظائف |
+| [StudentProfile](file:///c:/Users/fadyb/OneDrive/Desktop/projects/grandlink/profiles/models.py#5-27) → `SavedJob` | OneToMany | الطالب يحفظ عدة وظائف |
+| `Job` + [Student](file:///c:/Users/fadyb/OneDrive/Desktop/projects/grandlink/profiles/models.py#5-27) → `Application` | UniqueConstraint | **منع التقديم المزدوج** |
+
+### الـ API Endpoints المقترحة لموديول Jobs
+
+```
+# ── Jobs ──
+GET    /api/jobs/                           → قائمة الوظائف (مع filter & search)
+POST   /api/jobs/                           → إنشاء وظيفة (Employer فقط)
+GET    /api/jobs/<uuid>/                    → تفاصيل وظيفة
+PUT    /api/jobs/<uuid>/                    → تعديل وظيفة (Owner فقط)
+PATCH  /api/jobs/<uuid>/                    → تعديل جزئي
+DELETE /api/jobs/<uuid>/                    → حذف وظيفة (Owner فقط)
+
+# ── My Jobs (Employer Dashboard) ──
+GET    /api/jobs/my-jobs/                   → وظائفي المنشورة
+GET    /api/jobs/<uuid>/applications/       → المتقدمين لوظيفة معينة
+
+# ── Applications (Student) ──
+POST   /api/jobs/<uuid>/apply/              → التقديم على وظيفة
+GET    /api/jobs/my-applications/           → طلباتي
+PATCH  /api/jobs/applications/<uuid>/       → تحديث حالة الطلب (Employer)
+DELETE /api/jobs/applications/<uuid>/       → سحب الطلب (Student)
+
+# ── Saved Jobs ──
+POST   /api/jobs/<uuid>/save/              → حفظ وظيفة
+DELETE /api/jobs/<uuid>/unsave/            → إلغاء الحفظ
+GET    /api/jobs/saved/                    → الوظائف المحفوظة
+
+# ── Skills ──
+GET    /api/jobs/skills/                   → قائمة المهارات (للـ autocomplete)
+```
+
+---
+
+## 🔗 جاهزية Integration مع React
+
+### 1. ✅ CORS — جاهز لكن يحتاج تحسين
+
+```python
+# core/settings.py — الوضع الحالي ✅
+CORS_ALLOWED_ORIGINS = ['http://localhost:3000', 'http://127.0.0.1:3000']
+
+# ✅ أضف هذه الإعدادات:
+CORS_ALLOW_CREDENTIALS = True    # ← مطلوب لإرسال cookies مع الـ requests
+CORS_ALLOW_HEADERS = [
+    'accept', 'authorization', 'content-type',
+    'origin', 'x-requested-with', 'x-csrftoken',
+]
+```
+
+### 2. 🔴 Standardized API Response Format — غير موجود
+
+حالياً كل endpoint يرجع format مختلف. هذا يسبب مشاكل في الـ React frontend:
+
+```javascript
+// ❌ الوضع الحالي — كل endpoint له structure مختلف
+// Login:   { access, refresh, user }
+// Register: { message, email }
+// Error:    { error: "..." }  أحياناً  { password: ["..."] }  أحياناً
+```
+
+**الحل: Response Envelope موحد:**
+
+```python
+# core/renderers.py — ملف جديد
+from rest_framework.renderers import JSONRenderer
+
+class StandardJSONRenderer(JSONRenderer):
+    def render(self, data, accepted_media_type=None, renderer_context=None):
+        response = renderer_context.get('response')
+
+        if response and response.status_code >= 400:
+            wrapped = {
+                'success': False,
+                'errors': data,
+                'data': None
+            }
+        else:
+            wrapped = {
+                'success': True,
+                'data': data,
+                'errors': None
+            }
+
+        return super().render(wrapped, accepted_media_type, renderer_context)
+```
+
+```python
+# core/settings.py
+REST_FRAMEWORK = {
+    'DEFAULT_RENDERER_CLASSES': (
+        'core.renderers.StandardJSONRenderer',
+    ),
+    # ...
+}
+```
+
+```javascript
+// ✅ React يتعامل مع format واحد:
+const response = await api.post('/auth/login/', credentials);
+if (response.data.success) {
+    const { access, refresh, user } = response.data.data;
+    // store tokens
+} else {
+    const errors = response.data.errors;
+    // show errors
+}
+```
+
+### 3. 🔴 Pagination — غير موجود
+
+```python
+# core/settings.py — أضف
+REST_FRAMEWORK = {
+    # ...
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 20,
+}
+```
+
+```python
+# core/pagination.py — Custom pagination (أفضل)
+from rest_framework.pagination import PageNumberPagination
+from rest_framework.response import Response
+
+class StandardPagination(PageNumberPagination):
+    page_size = 20
+    page_size_query_param = 'page_size'
+    max_page_size = 100
+
+    def get_paginated_response(self, data):
+        return Response({
+            'count': self.page.paginator.count,
+            'total_pages': self.page.paginator.num_pages,
+            'current_page': self.page.number,
+            'page_size': self.get_page_size(self.request),
+            'next': self.get_next_link(),
+            'previous': self.get_previous_link(),
+            'results': data
+        })
+```
+
+### 4. 🟡 API Versioning — غير موجود
+
+```python
+# core/settings.py
+REST_FRAMEWORK = {
+    # ...
+    'DEFAULT_VERSIONING_CLASS': 'rest_framework.versioning.URLPathVersioning',
+    'DEFAULT_VERSION': 'v1',
+    'ALLOWED_VERSIONS': ['v1'],
+}
+```
+
+```python
+# core/urls.py — بعد التحديث
+urlpatterns = [
+    path('admin/', admin.site.urls),
+    path('api/v1/auth/', include('authentication.urls')),
+    path('api/v1/profiles/', include('profiles.urls')),
+    path('api/v1/jobs/', include('jobs.urls')),          # ← جديد
+]
+```
+
+### 5. 🟡 Exception Handling — غير موحد
+
+```python
+# core/exceptions.py — ملف جديد
+from rest_framework.views import exception_handler
+from rest_framework.response import Response
+
+def custom_exception_handler(exc, context):
+    response = exception_handler(exc, context)
+
+    if response is not None:
+        custom_response = {
+            'success': False,
+            'status_code': response.status_code,
+            'errors': response.data,
+        }
+        response.data = custom_response
+
+    return response
+```
+
+```python
+# core/settings.py
+REST_FRAMEWORK = {
+    # ...
+    'EXCEPTION_HANDLER': 'core.exceptions.custom_exception_handler',
+}
+```
+
+### 6. 🟡 Token Refresh Endpoint مفقود
+
+React يحتاج endpoint لتجديد الـ access token بدون إعادة تسجيل الدخول:
+
+```python
+# authentication/urls.py — أضف
+from rest_framework_simplejwt.views import TokenRefreshView
+
+urlpatterns = [
+    # ... existing ...
+    path('token/refresh/', TokenRefreshView.as_view(), name='token-refresh'),
+]
+```
+
+### 7. Checklist جاهزية الـ Frontend
+
+| المتطلب | الحالة | الإجراء المطلوب |
+|---------|--------|----------------|
+| CORS | ✅ | أضف `CORS_ALLOW_CREDENTIALS` |
+| JWT Auth | ✅ | أضف Token Refresh endpoint |
+| Response Format | 🔴 | أنشئ `StandardJSONRenderer` |
+| Pagination | 🔴 | أنشئ `StandardPagination` |
+| Error Handling | 🔴 | أنشئ `custom_exception_handler` |
+| API Versioning | 🟡 | أضف URL path versioning |
+| File Upload | ✅ | `MultiPartParser` موجود |
+| Search/Filter | 🔴 | أضف `django-filter` |
+| Media Files | ✅ | `MEDIA_URL` و `MEDIA_ROOT` مضبوطين |
+| Logout | 🔴 | أنشئ `LogoutView` |
+
+---
+
+## 📋 خطة التنفيذ المقترحة
+
+### المرحلة 1: Core Improvements (قبل بناء Jobs) — أسبوع واحد
+
+```
+الأولوية العالية:
+├── 1. إصلاح OTP security (secrets بدل random)
+├── 2. إضافة Rate Limiting / Throttling
+├── 3. تقليل OTP_EXPIRE_MINUTES و OTP_MAX_ATTEMPTS
+├── 4. إنشاء StandardJSONRenderer
+├── 5. إنشاء StandardPagination
+├── 6. إضافة Logout endpoint
+├── 7. إضافة Token Refresh endpoint
+└── 8. تحديث URLs لـ API versioning (v1)
+```
+
+### المرحلة 2: Build Jobs Module — أسبوعين
+
+```
+أسبوع 1:
+├── 1. إنشاء Models (Job, Application, SavedJob, Skill)
+├── 2. Migrations + Seed Skills data
+├── 3. إنشاء Serializers (مع validation)
+├── 4. إنشاء Views (CRUD + Custom actions)
+└── 5. إنشاء URLs + Permissions
+
+أسبوع 2:
+├── 6. إضافة Search & Filtering (django-filter)
+├── 7. إضافة Sorting
+├── 8. إنشاء Admin interface لـ Jobs
+├── 9. إضافة Tests
+└── 10. إضافة API Documentation (drf-spectacular)
+```
+
+### المرحلة 3: ATS Engine — أسبوعين
+
+```
+├── 1. Application status workflow
+├── 2. Email notifications (status changes)
+├── 3. Employer dashboard endpoints
+├── 4. Statistics & analytics endpoints
+└── 5. Full test coverage
+```
+
+### الـ Packages المقترح إضافتها
+
+```txt
+# أضف لـ requirements.txt
+django-filter>=23.0          # Advanced filtering for list views
+drf-spectacular>=0.27.0      # OpenAPI 3.0 documentation
+django-extensions>=3.2.0     # Debug tools (shell_plus, etc.)
+```
+
+> [!TIP]
+> **نصيحة أخيرة:** قبل البدء في بناء الـ Jobs module، أنصح بشدة بتنفيذ المرحلة 1 أولاً. هذا سيوفر عليك إعادة كتابة كود كثير لاحقاً ويضمن أن كل module جديد يتبع نفس الـ patterns من البداية.
+
+---
+
+> **تم الانتهاء من المراجعة. المشروع في وضع جيد ويحتاج فقط تحسينات استباقية قبل التوسع. أنا جاهز لبدء تنفيذ أي جزء من التوصيات أعلاه.** 🚀

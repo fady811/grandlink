@@ -1,0 +1,927 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GradLink Authentication Architecture Report</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+        @page {
+            size: A4;
+            margin: 1.8cm 2.2cm;
+        }
+
+        @media print {
+            body {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+
+            .no-print {
+                display: none !important;
+            }
+
+            .page-break {
+                page-break-before: always;
+            }
+
+            table,
+            pre,
+            blockquote {
+                page-break-inside: avoid;
+            }
+
+            h2,
+            h3 {
+                page-break-after: avoid;
+            }
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', 'Segoe UI', -apple-system, sans-serif;
+            font-size: 11pt;
+            line-height: 1.75;
+            color: #1e293b;
+            background: #f8fafc;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+
+        .report-container {
+            background: white;
+            padding: 50px 55px;
+            border-radius: 12px;
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
+        }
+
+        /* Print Button */
+        .print-btn {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            background: linear-gradient(135deg, #6366f1, #8b5cf6);
+            color: white;
+            border: none;
+            padding: 14px 28px;
+            border-radius: 50px;
+            font-family: 'Inter', sans-serif;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 8px 24px rgba(99, 102, 241, 0.4);
+            transition: all 0.2s;
+            z-index: 999;
+        }
+
+        .print-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 32px rgba(99, 102, 241, 0.5);
+        }
+
+        /* Header */
+        h1 {
+            font-size: 26pt;
+            font-weight: 700;
+            color: #0f172a;
+            margin-bottom: 6px;
+            letter-spacing: -0.5px;
+        }
+
+        .header-accent {
+            height: 4px;
+            width: 80px;
+            background: linear-gradient(90deg, #6366f1, #a78bfa);
+            border-radius: 2px;
+            margin-bottom: 16px;
+        }
+
+        .meta {
+            font-size: 10pt;
+            color: #64748b;
+            margin-bottom: 6px;
+            line-height: 1.9;
+        }
+
+        .meta strong {
+            color: #475569;
+            font-weight: 600;
+        }
+
+        hr {
+            border: none;
+            border-top: 1.5px solid #e2e8f0;
+            margin: 28px 0;
+        }
+
+        h2 {
+            font-size: 16pt;
+            font-weight: 700;
+            color: #1e40af;
+            margin-top: 32px;
+            margin-bottom: 14px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #e2e8f0;
+        }
+
+        h3 {
+            font-size: 12.5pt;
+            font-weight: 600;
+            color: #334155;
+            margin-top: 22px;
+            margin-bottom: 10px;
+        }
+
+        p {
+            margin-bottom: 12px;
+            text-align: justify;
+        }
+
+        /* Tables */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 16px 0;
+            font-size: 9.5pt;
+        }
+
+        thead th {
+            background: #1e293b;
+            color: white;
+            font-weight: 600;
+            text-align: left;
+            padding: 11px 14px;
+            letter-spacing: 0.3px;
+        }
+
+        thead th:first-child {
+            border-radius: 8px 0 0 0;
+        }
+
+        thead th:last-child {
+            border-radius: 0 8px 0 0;
+        }
+
+        tbody td {
+            padding: 9px 14px;
+            border-bottom: 1px solid #e2e8f0;
+            vertical-align: top;
+        }
+
+        tbody tr:nth-child(even) {
+            background: #f8fafc;
+        }
+
+        tbody tr:last-child td:first-child {
+            border-radius: 0 0 0 8px;
+        }
+
+        tbody tr:last-child td:last-child {
+            border-radius: 0 0 8px 0;
+        }
+
+        /* Code */
+        code {
+            font-family: 'JetBrains Mono', 'Consolas', monospace;
+            font-size: 9pt;
+            background: #f1f5f9;
+            padding: 2px 7px;
+            border-radius: 4px;
+            color: #7c3aed;
+        }
+
+        pre {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 18px 20px;
+            border-radius: 10px;
+            margin: 16px 0;
+            overflow-x: auto;
+            font-size: 9pt;
+            line-height: 1.6;
+            border: 1px solid #334155;
+        }
+
+        pre code {
+            background: none;
+            color: #e2e8f0;
+            padding: 0;
+        }
+
+        .keyword {
+            color: #c084fc;
+        }
+
+        .string {
+            color: #86efac;
+        }
+
+        .comment {
+            color: #64748b;
+            font-style: italic;
+        }
+
+        /* Blockquote / Notes */
+        blockquote {
+            border-left: 4px solid #6366f1;
+            padding: 12px 18px;
+            margin: 14px 0;
+            background: #f8fafc;
+            border-radius: 0 8px 8px 0;
+            font-size: 10pt;
+            color: #475569;
+        }
+
+        .tip-box {
+            border-left: 4px solid #10b981;
+            background: #f0fdf4;
+            padding: 12px 18px;
+            margin: 14px 0;
+            border-radius: 0 8px 8px 0;
+            font-size: 10pt;
+        }
+
+        .tip-box .tip-label {
+            color: #059669;
+            font-weight: 700;
+            font-size: 9pt;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+        }
+
+        /* Lists */
+        ul,
+        ol {
+            margin: 10px 0 10px 22px;
+        }
+
+        li {
+            margin-bottom: 5px;
+        }
+
+        strong {
+            color: #0f172a;
+        }
+
+        /* Emoji styling */
+        .check {
+            color: #22c55e;
+        }
+
+        .cross {
+            color: #ef4444;
+        }
+
+        .warn {
+            color: #f59e0b;
+        }
+
+        /* Diagram placeholder */
+        .diagram-box {
+            background: #f8fafc;
+            border: 2px dashed #cbd5e1;
+            border-radius: 12px;
+            padding: 24px;
+            margin: 16px 0;
+            text-align: center;
+        }
+
+        .diagram-box svg {
+            max-width: 100%;
+        }
+
+        .flow-container {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            font-size: 9.5pt;
+            font-family: 'JetBrains Mono', monospace;
+            background: #fafbff;
+            border: 1px solid #e2e8f0;
+            border-radius: 10px;
+            padding: 20px 24px;
+            margin: 16px 0;
+        }
+
+        .flow-step {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 6px 0;
+        }
+
+        .flow-step .arrow {
+            color: #6366f1;
+            font-weight: 700;
+        }
+
+        .flow-step .label {
+            background: #eef2ff;
+            padding: 4px 10px;
+            border-radius: 6px;
+            color: #4338ca;
+            font-weight: 500;
+            font-size: 8.5pt;
+        }
+
+        .flow-step .desc {
+            color: #475569;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .flow-section-title {
+            font-weight: 700;
+            color: #1e293b;
+            font-family: 'Inter', sans-serif;
+            margin-top: 10px;
+            margin-bottom: 2px;
+            font-size: 10pt;
+        }
+    </style>
+</head>
+
+<body>
+
+    <button class="print-btn no-print" onclick="window.print()">📄 Save as PDF</button>
+
+    <div class="report-container">
+
+        <!-- HEADER -->
+        <h1>GradLink Authentication Architecture Report</h1>
+        <div class="header-accent"></div>
+        <p class="meta">
+            <strong>Project:</strong> GradLink (Django REST Framework)<br>
+            <strong>Date:</strong> March 3, 2026<br>
+            <strong>Scope:</strong> Authentication mechanism analysis, comparison, and justification
+        </p>
+
+        <hr>
+
+        <!-- SECTION 1 -->
+        <h2>1. Authentication Type Used: JWT (JSON Web Tokens) via SimpleJWT</h2>
+
+        <p>GradLink uses <code>djangorestframework-simplejwt</code> as its primary authentication backend. This is a
+            <strong>stateless, token-based authentication system</strong> that issues two types of tokens:
+        </p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Token</th>
+                    <th>Purpose</th>
+                    <th>Lifetime</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Access Token</strong></td>
+                    <td>Sent with every API request in the <code>Authorization: Bearer &lt;token&gt;</code> header to
+                        prove identity</td>
+                    <td><strong>60 minutes</strong></td>
+                </tr>
+                <tr>
+                    <td><strong>Refresh Token</strong></td>
+                    <td>Used to obtain a new access token without re-entering credentials</td>
+                    <td><strong>1 day</strong></td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>How It Works in GradLink</h3>
+
+        <div class="mermaid">
+            sequenceDiagram
+            participant Client as React Frontend
+            participant API as Django API
+            participant DB as PostgreSQL
+
+            Note over Client, API: Registration Flow
+            Client->>API: POST /auth/register/ {email, password, role}
+            API->>DB: Create inactive user
+            API->>Client: 📧 OTP sent to email
+
+            Note over Client, API: OTP Verification
+            Client->>API: POST /auth/verify-otp/ {email, code}
+            API->>DB: Activate user
+            API-->>Client: {access_token, refresh_token}
+
+            Note over Client, API: Normal Login
+            Client->>API: POST /auth/login/ {email, password}
+            API-->>Client: {access_token, refresh_token, user}
+
+            Note over Client, API: Authenticated Request
+            Client->>API: GET /api/jobs/ [Authorization: Bearer access]
+            API-->>Client: ✅ 200 OK + Data
+
+            Note over Client, API: Token Refresh
+            Client->>API: POST /auth/token/refresh/ {refresh_token}
+            API-->>Client: {new_access_token, new_refresh_token}
+        </div>
+
+        <h3>Configuration in settings.py</h3>
+
+        <pre><code><span class="keyword">REST_FRAMEWORK</span> = {
+    <span class="string">'DEFAULT_AUTHENTICATION_CLASSES'</span>: (
+        <span class="string">'rest_framework_simplejwt.authentication.JWTAuthentication'</span>,
+    ),
+}
+
+<span class="keyword">SIMPLE_JWT</span> = {
+    <span class="string">'ACCESS_TOKEN_LIFETIME'</span>: timedelta(minutes=60),
+    <span class="string">'REFRESH_TOKEN_LIFETIME'</span>: timedelta(days=1),
+    <span class="string">'ROTATE_REFRESH_TOKENS'</span>: True,        <span class="comment"># New refresh token on each refresh</span>
+    <span class="string">'BLACKLIST_AFTER_ROTATION'</span>: True,      <span class="comment"># Old refresh tokens are blacklisted</span>
+}</code></pre>
+
+        <h3>Additional Auth Features Implemented</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Feature</th>
+                    <th>Implementation</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Email-based login</strong></td>
+                    <td>Custom User model with <code>email</code> as <code>USERNAME_FIELD</code> (no username)</td>
+                </tr>
+                <tr>
+                    <td><strong>OTP Email Verification</strong></td>
+                    <td>6-digit OTP sent via SMTP, stored in <code>OTPVerification</code> model with expiry &amp;
+                        attempt limits</td>
+                </tr>
+                <tr>
+                    <td><strong>Google OAuth2 SSO</strong></td>
+                    <td>Server-side Google token verification → auto-create/login user → issue JWT</td>
+                </tr>
+                <tr>
+                    <td><strong>Role-based access</strong></td>
+                    <td>User roles: <code>student</code>, <code>employer</code>, <code>admin</code></td>
+                </tr>
+                <tr>
+                    <td><strong>Soft delete</strong></td>
+                    <td><code>soft_delete()</code> / <code>reactivate()</code> methods with 30-day window</td>
+                </tr>
+                <tr>
+                    <td><strong>Token rotation</strong></td>
+                    <td>Refresh tokens are rotated and old ones blacklisted</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <hr>
+
+        <!-- SECTION 2 -->
+        <h2>2. Comparison with Other Authentication Methods</h2>
+
+        <h3>2.1 Session-Based Authentication (Django Default)</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Aspect</th>
+                    <th>Session Auth</th>
+                    <th>JWT (SimpleJWT) ✅</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>State</strong></td>
+                    <td><strong>Stateful</strong> — session stored server-side (DB / cache)</td>
+                    <td><strong>Stateless</strong> — token is self-contained</td>
+                </tr>
+                <tr>
+                    <td><strong>Storage</strong></td>
+                    <td>Server stores session in DB; client holds <code>sessionid</code> cookie</td>
+                    <td>Server stores nothing*; client holds token</td>
+                </tr>
+                <tr>
+                    <td><strong>Scalability</strong></td>
+                    <td><span class="cross">❌</span> Every request hits DB to validate session</td>
+                    <td><span class="check">✅</span> Token validated by signature only — no DB hit</td>
+                </tr>
+                <tr>
+                    <td><strong>Cross-domain</strong></td>
+                    <td><span class="cross">❌</span> Cookies are domain-locked; hard with separate frontend</td>
+                    <td><span class="check">✅</span> Token sent in header; works across any domain</td>
+                </tr>
+                <tr>
+                    <td><strong>Mobile / SPA</strong></td>
+                    <td><span class="cross">❌</span> Cookies awkward on mobile &amp; single-page apps</td>
+                    <td><span class="check">✅</span> Perfect fit for React SPA + mobile apps</td>
+                </tr>
+                <tr>
+                    <td><strong>CSRF</strong></td>
+                    <td><span class="cross">❌</span> Requires CSRF protection for cookies</td>
+                    <td><span class="check">✅</span> No cookies = no CSRF vulnerability</td>
+                </tr>
+                <tr>
+                    <td><strong>Logout</strong></td>
+                    <td><span class="check">✅</span> Simple server-side invalidation</td>
+                    <td><span class="warn">⚠️</span> Requires blacklisting (GradLink has this)</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <blockquote>
+            * With <code>BLACKLIST_AFTER_ROTATION=True</code>, GradLink does store blacklisted refresh tokens, but this
+            is a lightweight operation.
+        </blockquote>
+
+        <h3>2.2 Token Authentication (DRF's Built-in TokenAuthentication)</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Aspect</th>
+                    <th>DRF TokenAuth</th>
+                    <th>JWT (SimpleJWT) ✅</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Token type</strong></td>
+                    <td>Single permanent token per user</td>
+                    <td>Paired access + refresh tokens</td>
+                </tr>
+                <tr>
+                    <td><strong>Expiration</strong></td>
+                    <td><span class="cross">❌</span> <strong>No built-in expiration</strong> — token is valid forever
+                    </td>
+                    <td><span class="check">✅</span> Access token auto-expires (60 min)</td>
+                </tr>
+                <tr>
+                    <td><strong>DB dependency</strong></td>
+                    <td><span class="cross">❌</span> Every request queries the <code>authtoken_token</code> table</td>
+                    <td><span class="check">✅</span> Access token verified by cryptographic signature</td>
+                </tr>
+                <tr>
+                    <td><strong>Security</strong></td>
+                    <td><span class="cross">❌</span> If stolen, token is valid indefinitely</td>
+                    <td><span class="check">✅</span> Short-lived access token limits damage window</td>
+                </tr>
+                <tr>
+                    <td><strong>Rotation</strong></td>
+                    <td><span class="cross">❌</span> Manual implementation needed</td>
+                    <td><span class="check">✅</span> Built-in refresh rotation + blacklisting</td>
+                </tr>
+                <tr>
+                    <td><strong>Payload</strong></td>
+                    <td><span class="cross">❌</span> No payload — just an opaque string</td>
+                    <td><span class="check">✅</span> JWT contains claims (user ID, role, expiry)</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>2.3 OAuth2 / Third-Party Providers Only</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Aspect</th>
+                    <th>OAuth2 Only</th>
+                    <th>JWT + OAuth2 (GradLink's approach) ✅</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Provider dependency</strong></td>
+                    <td><span class="cross">❌</span> 100% dependent on Google/Facebook uptime</td>
+                    <td><span class="check">✅</span> JWT works independently; Google is optional</td>
+                </tr>
+                <tr>
+                    <td><strong>Local accounts</strong></td>
+                    <td><span class="cross">❌</span> Cannot support email/password registration</td>
+                    <td><span class="check">✅</span> Supports both local + Google sign-in</td>
+                </tr>
+                <tr>
+                    <td><strong>Complexity</strong></td>
+                    <td><span class="cross">❌</span> Complex OAuth flows for every request</td>
+                    <td><span class="check">✅</span> OAuth only at login; JWT for all subsequent requests</td>
+                </tr>
+                <tr>
+                    <td><strong>Offline access</strong></td>
+                    <td><span class="cross">❌</span> Requires constant provider connectivity</td>
+                    <td><span class="check">✅</span> JWT validated locally</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>2.4 API Key Authentication</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Aspect</th>
+                    <th>API Key</th>
+                    <th>JWT (SimpleJWT) ✅</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Use case</strong></td>
+                    <td>Machine-to-machine / 3rd party integrations</td>
+                    <td>User-facing applications</td>
+                </tr>
+                <tr>
+                    <td><strong>Identity</strong></td>
+                    <td><span class="cross">❌</span> Identifies the application, not the user</td>
+                    <td><span class="check">✅</span> Token carries user identity (ID, role)</td>
+                </tr>
+                <tr>
+                    <td><strong>Expiration</strong></td>
+                    <td><span class="cross">❌</span> Typically permanent</td>
+                    <td><span class="check">✅</span> Auto-expiring with rotation</td>
+                </tr>
+                <tr>
+                    <td><strong>Granularity</strong></td>
+                    <td><span class="cross">❌</span> One key per service</td>
+                    <td><span class="check">✅</span> Per-user tokens with role-based permissions</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>2.5 Summary Comparison Matrix</h3>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Feature</th>
+                    <th>Session</th>
+                    <th>DRF Token</th>
+                    <th>API Key</th>
+                    <th>OAuth2 Only</th>
+                    <th>JWT (SimpleJWT) ✅</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Stateless</td>
+                    <td><span class="cross">❌</span></td>
+                    <td><span class="cross">❌</span></td>
+                    <td><span class="cross">❌</span></td>
+                    <td><span class="cross">❌</span></td>
+                    <td><span class="check">✅</span></td>
+                </tr>
+                <tr>
+                    <td>Auto-expiration</td>
+                    <td><span class="check">✅</span></td>
+                    <td><span class="cross">❌</span></td>
+                    <td><span class="cross">❌</span></td>
+                    <td><span class="check">✅</span></td>
+                    <td><span class="check">✅</span></td>
+                </tr>
+                <tr>
+                    <td>SPA-friendly</td>
+                    <td><span class="cross">❌</span></td>
+                    <td><span class="check">✅</span></td>
+                    <td><span class="check">✅</span></td>
+                    <td><span class="warn">⚠️</span></td>
+                    <td><span class="check">✅</span></td>
+                </tr>
+                <tr>
+                    <td>Mobile-friendly</td>
+                    <td><span class="cross">❌</span></td>
+                    <td><span class="check">✅</span></td>
+                    <td><span class="check">✅</span></td>
+                    <td><span class="warn">⚠️</span></td>
+                    <td><span class="check">✅</span></td>
+                </tr>
+                <tr>
+                    <td>No CSRF needed</td>
+                    <td><span class="cross">❌</span></td>
+                    <td><span class="check">✅</span></td>
+                    <td><span class="check">✅</span></td>
+                    <td><span class="check">✅</span></td>
+                    <td><span class="check">✅</span></td>
+                </tr>
+                <tr>
+                    <td>Carries user data</td>
+                    <td><span class="cross">❌</span></td>
+                    <td><span class="cross">❌</span></td>
+                    <td><span class="cross">❌</span></td>
+                    <td><span class="check">✅</span></td>
+                    <td><span class="check">✅</span></td>
+                </tr>
+                <tr>
+                    <td>Scalable</td>
+                    <td><span class="cross">❌</span></td>
+                    <td><span class="cross">❌</span></td>
+                    <td><span class="check">✅</span></td>
+                    <td><span class="warn">⚠️</span></td>
+                    <td><span class="check">✅</span></td>
+                </tr>
+                <tr>
+                    <td>Works cross-domain</td>
+                    <td><span class="cross">❌</span></td>
+                    <td><span class="check">✅</span></td>
+                    <td><span class="check">✅</span></td>
+                    <td><span class="check">✅</span></td>
+                    <td><span class="check">✅</span></td>
+                </tr>
+            </tbody>
+        </table>
+
+        <hr>
+        <div class="page-break"></div>
+
+        <!-- SECTION 3 -->
+        <h2>3. Why JWT (SimpleJWT) Is the Best Fit for GradLink</h2>
+
+        <h3>3.1 Architecture Match: Django + React SPA</h3>
+
+        <p>GradLink's architecture is a <strong>Django REST API backend</strong> with a <strong>React frontend</strong>
+            running on separate domains/ports (<code>localhost:8000</code> vs <code>localhost:3000</code>). This is the
+            textbook use case for JWT:</p>
+
+        <ul>
+            <li><strong>Cross-origin by design</strong> — JWT tokens are sent via <code>Authorization</code> headers,
+                not cookies, so CORS is straightforward.</li>
+            <li><strong>No session infrastructure needed</strong> — The React app stores tokens in memory/localStorage
+                and attaches them to every request.</li>
+            <li><strong>No CSRF vulnerabilities</strong> — Since no cookies are used for auth, CSRF attacks are not
+                applicable.</li>
+        </ul>
+
+        <h3>3.2 Performance &amp; Scalability</h3>
+
+        <ul>
+            <li><strong>Zero DB queries for authentication</strong> — Every incoming request is validated by verifying
+                the JWT signature using the <code>SECRET_KEY</code>. No database roundtrip.</li>
+            <li><strong>Horizontal scaling</strong> — Any server instance can validate any token. No shared session
+                store (e.g., Redis) needed for auth.</li>
+            <li><strong>Ideal for high-traffic endpoints</strong> — Job listings, ATS operations, and profile queries
+                are authenticated without DB overhead.</li>
+        </ul>
+
+        <h3>3.3 Security Features Already Implemented</h3>
+
+        <p>GradLink has leveraged SimpleJWT's security features correctly:</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Security Feature</th>
+                    <th>Status</th>
+                    <th>Impact</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Short access token lifetime (60 min)</strong></td>
+                    <td><span class="check">✅</span> Configured</td>
+                    <td>Limits exposure if token is stolen</td>
+                </tr>
+                <tr>
+                    <td><strong>Refresh token rotation</strong></td>
+                    <td><span class="check">✅</span> <code>ROTATE_REFRESH_TOKENS=True</code></td>
+                    <td>Every refresh issues a new pair, preventing reuse</td>
+                </tr>
+                <tr>
+                    <td><strong>Blacklisting old tokens</strong></td>
+                    <td><span class="check">✅</span> <code>BLACKLIST_AFTER_ROTATION=True</code></td>
+                    <td>Stolen refresh tokens become invalid after rotation</td>
+                </tr>
+                <tr>
+                    <td><strong>OTP email verification</strong></td>
+                    <td><span class="check">✅</span> Custom implementation</td>
+                    <td>Prevents fake accounts; verifies email ownership</td>
+                </tr>
+                <tr>
+                    <td><strong>Google OAuth2 integration</strong></td>
+                    <td><span class="check">✅</span> Server-side verification</td>
+                    <td>Trusted identity from Google without storing Google passwords</td>
+                </tr>
+                <tr>
+                    <td><strong>Password validation</strong></td>
+                    <td><span class="check">✅</span> Django validators enabled</td>
+                    <td>Enforces strong passwords</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>3.4 Multi-Role System Compatibility</h3>
+
+        <p>GradLink has three distinct user roles: <code>student</code>, <code>employer</code>, and <code>admin</code>.
+            JWT naturally supports this because:</p>
+
+        <ul>
+            <li>The token payload carries the user ID, which maps to a role in the database.</li>
+            <li>Role-based permission classes can be applied per-view without additional auth queries.</li>
+            <li>Different frontends (student dashboard, employer portal, admin panel) can all use the same JWT
+                mechanism.</li>
+        </ul>
+
+        <h3>3.5 Mobile-Ready</h3>
+
+        <p>If GradLink ever expands to mobile apps (iOS/Android), JWT works out of the box:</p>
+
+        <ul>
+            <li>Tokens are stored in secure device storage.</li>
+            <li>No cookie management or WebView session hacks.</li>
+            <li>Same API, same auth headers, same backend — zero changes needed.</li>
+        </ul>
+
+        <hr>
+
+        <!-- SECTION 4 -->
+        <h2>4. Potential Improvements</h2>
+
+        <div class="tip-box">
+            <div class="tip-label">💡 Tip</div>
+            These are recommendations for further hardening, not issues with the current choice.
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Improvement</th>
+                    <th>Rationale</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Store tokens in <code>httpOnly</code> cookies</strong> (optional)</td>
+                    <td>Prevents XSS from accessing tokens in localStorage. SimpleJWT supports this pattern.</td>
+                </tr>
+                <tr>
+                    <td><strong>Add <code>jti</code> claim checking</strong></td>
+                    <td>Track individual token IDs for per-token revocation.</td>
+                </tr>
+                <tr>
+                    <td><strong>Implement sliding sessions</strong></td>
+                    <td>Automatically extend active users' sessions by issuing new tokens on activity.</td>
+                </tr>
+                <tr>
+                    <td><strong>Add rate limiting on login/OTP</strong></td>
+                    <td>Prevent brute-force attacks on the login and OTP endpoints.</td>
+                </tr>
+                <tr>
+                    <td><strong>Consider <code>RS256</code> signing</strong></td>
+                    <td>Allows public key verification by microservices without sharing the secret key.</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <hr>
+
+        <!-- SECTION 5 -->
+        <h2>5. Conclusion</h2>
+
+        <p><strong>JWT via SimpleJWT is the optimal authentication strategy for GradLink</strong> because:</p>
+
+        <ol>
+            <li><span class="check">✅</span> It is <strong>purpose-built</strong> for Django REST + React SPA
+                architectures.</li>
+            <li><span class="check">✅</span> It provides <strong>stateless, scalable authentication</strong> with zero
+                DB overhead per request.</li>
+            <li><span class="check">✅</span> It supports <strong>cross-origin requests</strong> natively — essential for
+                separate frontend/backend deployments.</li>
+            <li><span class="check">✅</span> The <strong>token rotation and blacklisting</strong> features are already
+                configured, providing strong security.</li>
+            <li><span class="check">✅</span> It seamlessly integrates with <strong>Google OAuth2 SSO</strong> as an
+                additional login method.</li>
+            <li><span class="check">✅</span> It's <strong>mobile-ready</strong> for future platform expansion.</li>
+            <li><span class="check">✅</span> It's the <strong>industry standard</strong> for modern API authentication,
+                with strong community support and documentation.</li>
+        </ol>
+
+        <p>No other authentication method checks all these boxes for GradLink's specific requirements.</p>
+
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script>
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'default',
+            sequence: {
+                diagramMarginX: 20,
+                diagramMarginY: 10,
+                actorMargin: 60,
+                width: 150,
+                height: 50,
+                boxMargin: 10,
+                boxTextMargin: 5,
+                noteMargin: 10,
+                messageMargin: 35,
+                mirrorActors: true,
+                useMaxWidth: true
+            }
+        });
+    </script>
+
+</body>
+
+</html>
